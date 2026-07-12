@@ -1,0 +1,24 @@
+# --- Java / Spring Boot (Maven) ---
+target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+
+# --- Node / React (Vite) ---
+node_modules/
+dist/
+*.log
+
+# --- Environment / secrets ---
+.env
+.env.local
+.env.*.local
+
+# --- IDE / editor ---
+.vscode/
+.idea/
+*.iml
+
+# --- OS junk (Windows) ---
+Thumbs.db
+desktop.ini
