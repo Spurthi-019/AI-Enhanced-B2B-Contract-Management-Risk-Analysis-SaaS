@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: contractiq-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: contractiq
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: contractiq
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  mongodb:
+    image: mongo:7
+    container_name: contractiq-mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: contractiq
+      MONGO_INITDB_ROOT_PASSWORD: devpassword
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  postgres_data:
+  mongo_data:
