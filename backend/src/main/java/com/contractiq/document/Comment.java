@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 
+import org.springframework.data.annotation.CreatedDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -21,5 +22,6 @@ public class Comment {
     
     private boolean isVendorFacing; // strict internal/vendor separation flag
     
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @CreatedDate
+    private LocalDateTime createdAt;
 }
