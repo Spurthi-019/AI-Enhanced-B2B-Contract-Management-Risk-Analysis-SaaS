@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: backend
+  datasource:
+    url: jdbc:postgresql://localhost:5433/contractiq
+    username: contractiq
+    password: devpassword
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  port: 8081
+
+# Disable basic auth endpoints to avoid redirection issues during startup/checks if needed, or keep it standard
+security:
+  basic:
+    enabled: false
