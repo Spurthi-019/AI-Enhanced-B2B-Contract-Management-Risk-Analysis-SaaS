@@ -17,6 +17,21 @@ spring:
   data:
     mongodb:
       uri: mongodb://contractiq:devpassword@localhost:27017/contractiq?authSource=admin
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        options:
+          model: llama3
+      embedding:
+        options:
+          model: nomic-embed-text
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 768
 
 server:
   port: 8081
