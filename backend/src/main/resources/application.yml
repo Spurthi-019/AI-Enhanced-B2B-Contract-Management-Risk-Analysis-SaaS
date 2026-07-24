@@ -32,6 +32,17 @@ spring:
         index-type: HNSW
         distance-type: COSINE_DISTANCE
         dimensions: 768
+  mail:
+    host: sandbox.smtp.mailtrap.io
+    port: 2525
+    username: mock-username
+    password: mock-password
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 server:
   port: 8081
