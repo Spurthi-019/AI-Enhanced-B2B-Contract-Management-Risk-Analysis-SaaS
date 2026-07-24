@@ -29,6 +29,10 @@ public class ContractDocument {
 
     private List<ContractVersion> versionHistory;
 
+    private String originalFilename;
+
+    private String storedFilePath;
+
     @CreatedDate
     private LocalDateTime createdAt;
 }

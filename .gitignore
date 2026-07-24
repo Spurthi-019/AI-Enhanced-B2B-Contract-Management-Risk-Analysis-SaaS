@@ -22,3 +22,6 @@ dist/
 # --- OS junk (Windows) ---
 Thumbs.db
 desktop.ini
+
+# --- Local uploads ---
+backend/uploads/

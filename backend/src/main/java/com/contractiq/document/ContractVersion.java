@@ -18,6 +18,8 @@ public class ContractVersion {
     private String fullText;
     
     private List<Comment> comments;
+
+    private com.contractiq.dto.ContractAnalysisResponse analysis;
     
     @LastModifiedDate
     private LocalDateTime updatedAt;
