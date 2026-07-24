@@ -21,7 +21,11 @@ spring:
 server:
   port: 8081
 
-# Disable basic auth endpoints to avoid redirection issues during startup/checks if needed, or keep it standard
 security:
-  basic:
-    enabled: false
+  jwt:
+    secret: 3c963f221415d556488339bcfefd38392138bc9e96e54e4df0c0612c6f1a8c9e
+    expiration-ms: 86400000
+
+logging:
+  level:
+    org.springframework.security: DEBUG
