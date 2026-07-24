@@ -42,5 +42,5 @@ public class User {
     @ManyToMany(mappedBy = "users", fetch = FetchType.LAZY)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
-    private Set<Role> roles;
+    private Set<Role> roles = new java.util.HashSet<>();
 }
