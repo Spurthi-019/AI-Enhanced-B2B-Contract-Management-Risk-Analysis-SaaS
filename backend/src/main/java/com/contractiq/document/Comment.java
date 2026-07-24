@@ -16,9 +16,9 @@ public class Comment {
     @Id
     private String id;
     
-    private String authorId;
+    private String authorEmail;
     
-    private String text;
+    private String content;
     
     private boolean isVendorFacing; // strict internal/vendor separation flag
     

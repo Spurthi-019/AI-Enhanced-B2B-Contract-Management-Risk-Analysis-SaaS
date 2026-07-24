@@ -27,8 +27,8 @@ public class VectorIndexingService {
         this.vectorStore = vectorStore;
     }
 
-    public void indexContract(String contractId, String tenantId, String filePath) {
-        log.info("Indexing contract: {} for tenant: {} at: {}", contractId, tenantId, filePath);
+    public void indexContract(String contractId, String tenantId, String filePath, int versionNumber) {
+        log.info("Indexing contract: {} (version: {}) for tenant: {} at: {}", contractId, versionNumber, tenantId, filePath);
         
         // 1. Parse text from PDF
         String fullText;
@@ -54,6 +54,7 @@ public class VectorIndexingService {
             Map<String, Object> metadata = new HashMap<>();
             metadata.put("tenantId", tenantId);
             metadata.put("contractId", contractId);
+            metadata.put("version", versionNumber);
             metadata.put("chunkIndex", i);
             
             Document doc = new Document(chunks.get(i), metadata);

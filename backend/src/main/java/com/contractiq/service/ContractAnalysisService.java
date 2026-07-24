@@ -29,12 +29,12 @@ public class ContractAnalysisService {
         this.vectorStore = vectorStore;
     }
 
-    public ContractAnalysisResponse analyzeContract(String contractId, String tenantId) {
-        log.info("Starting risk analysis for contract: {} under tenant: {}", contractId, tenantId);
+    public ContractAnalysisResponse analyzeContract(String contractId, String tenantId, int versionNumber) {
+        log.info("Starting risk analysis for contract: {} (version: {}) under tenant: {}", contractId, versionNumber, tenantId);
 
         // 1. Query vector database for relevant contract chunks (RAG context)
-        // We filter by tenantId and contractId metadata for strict multi-tenant isolation.
-        String filterExpression = String.format("tenantId == '%s' && contractId == '%s'", tenantId, contractId);
+        // We filter by tenantId, contractId, and version metadata for strict version isolation.
+        String filterExpression = String.format("tenantId == '%s' && contractId == '%s' && version == %d", tenantId, contractId, versionNumber);
         
         SearchRequest searchRequest = SearchRequest.query("liabilities indemnities termination warranty risk")
                 .withTopK(8)
