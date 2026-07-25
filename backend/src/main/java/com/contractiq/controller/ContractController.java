@@ -61,6 +61,17 @@ public class ContractController {
         this.emailNotificationService = emailNotificationService;
     }
 
+    @GetMapping
+    public ResponseEntity<List<ContractDocument>> getContracts() {
+        log.info("Received request to list all contracts");
+        String tenantId = TenantContext.getTenantId();
+        if (tenantId == null || tenantId.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing tenant context");
+        }
+        List<ContractDocument> list = contractDocumentRepository.findByTenantId(tenantId);
+        return ResponseEntity.ok(list);
+    }
+
     @PostMapping("/upload")
     public ResponseEntity<ContractDocument> uploadContract(
             @RequestParam("file") MultipartFile file,
