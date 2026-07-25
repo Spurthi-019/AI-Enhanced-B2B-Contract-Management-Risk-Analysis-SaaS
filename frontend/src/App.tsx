@@ -43,6 +43,12 @@ interface Contract {
   createdAt: string;
 }
 
+interface AuditActivity {
+  id: string;
+  description: string;
+  timestamp: string;
+}
+
 const BACKEND_URL = 'http://localhost:8081';
 
 function App() {
@@ -50,10 +56,19 @@ function App() {
   const [email, setEmail] = useState('test@contractiq.com');
   const [password, setPassword] = useState('devpassword');
   
-  // Dashboard states
+  // Dashboard & Navigation states
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'contracts' | 'upload' | 'settings'>('dashboard');
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
+  const [activities, setActivities] = useState<AuditActivity[]>([
+    { id: '1', description: 'System database initializer completed.', timestamp: 'Just now' }
+  ]);
   
+  // Pagination & Search states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 5;
+
   // Form states
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -95,6 +110,15 @@ function App() {
     setTimeout(() => setToast(null), 4000);
   };
 
+  const addActivity = (desc: string) => {
+    const newAct = {
+      id: Math.random().toString(),
+      description: desc,
+      timestamp: new Date().toLocaleTimeString()
+    };
+    setActivities(prev => [newAct, ...prev]);
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -108,6 +132,7 @@ function App() {
         localStorage.setItem('token', data.token);
         setToken(data.token);
         showToast('Successfully authenticated with developer credentials!');
+        addActivity('Administrator authenticated successfully.');
       } else {
         showToast('Authentication failed. Check your password.');
       }
@@ -122,6 +147,7 @@ function App() {
     setContracts([]);
     setSelectedContract(null);
     showToast('Logged out of ContractIQ session.');
+    addActivity('User logged out of active workspace.');
   };
 
   const loadContracts = async (authToken: string) => {
@@ -132,7 +158,7 @@ function App() {
       if (res.ok) {
         const list = await res.json();
         setContracts(list);
-        if (list.length > 0) {
+        if (list.length > 0 && !selectedContract) {
           setSelectedContract(list[0]);
         }
       }
@@ -160,14 +186,16 @@ function App() {
       });
       if (res.ok) {
         const doc = await res.json();
-        setContracts([doc, ...contracts]);
+        setContracts(prev => [doc, ...prev]);
         setSelectedContract(doc);
         setUploadTitle('');
         setUploadFile(null);
-        showToast('Contract uploaded, parsed, and indexed in PGVector successfully!');
+        showToast('Contract uploaded and vector indexed successfully!');
+        addActivity(`Uploaded new contract: "${doc.title}".`);
         
         // Auto trigger analysis
-        triggerAnalysis(doc.id);
+        triggerAnalysis(doc.id, doc.title);
+        setActiveTab('contracts');
       } else {
         const errText = await res.text();
         showToast(`Upload failed: ${errText}`);
@@ -178,50 +206,21 @@ function App() {
   };
 
   // Trigger RAG risk analysis
-  const triggerAnalysis = async (contractId: string) => {
+  const triggerAnalysis = async (contractId: string, title: string) => {
     try {
       const res = await fetch(`${BACKEND_URL}/api/v1/contracts/${contractId}/analyze`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
-        const analysisResult = await res.json();
         showToast('Legal risk analysis report generated successfully!');
-        
+        addActivity(`Generated legal risk report for "${title}".`);
         // Reload contract state
-        fetchLatestContractState(contractId);
+        loadContracts(token!);
       }
     } catch (err) {
       showToast('Error during RAG risk evaluation');
     }
-  };
-
-  const fetchLatestContractState = async (contractId: string) => {
-    // In typical setup, we get comments/metadata
-    // Since there's no singular GET contract endpoint, we fetch comments and synthesize contract updates
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/v1/contracts/${contractId}/comments`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const comments = await res.json();
-        if (selectedContract) {
-          const updated = { ...selectedContract };
-          const activeVer = updated.versionHistory.find(v => v.versionNumber === updated.currentVersion);
-          if (activeVer) {
-            activeVer.comments = comments;
-          }
-          setSelectedContract(updated);
-        }
-      }
-    } catch (err) {
-      logError(err);
-    }
-  };
-
-  const logError = (err: any) => {
-    console.error(err);
   };
 
   // Upload revised version
@@ -241,8 +240,10 @@ function App() {
       if (res.ok) {
         const updatedDoc = await res.json();
         setSelectedContract(updatedDoc);
+        setContracts(prev => prev.map(c => c.id === updatedDoc.id ? updatedDoc : c));
         setNewVersionFile(null);
-        showToast(`Successfully uploaded revised version ${updatedDoc.currentVersion}! re-indexed & analyzed.`);
+        showToast(`Successfully uploaded revised version ${updatedDoc.currentVersion}!`);
+        addActivity(`Uploaded version ${updatedDoc.currentVersion} for "${updatedDoc.title}".`);
       } else {
         const errText = await res.text();
         showToast(`Version upload failed: ${errText}`);
@@ -275,8 +276,10 @@ function App() {
           activeVer.comments.push(comment);
         }
         setSelectedContract(updated);
+        setContracts(prev => prev.map(c => c.id === updated.id ? updated : c));
         setCommentContent('');
         showToast('Comment posted successfully!');
+        addActivity(`Added note on "${selectedContract.title}" v${selectedContract.currentVersion}.`);
       }
     } catch (err) {
       showToast('Failed to post comment');
@@ -295,10 +298,9 @@ function App() {
       });
       if (res.ok) {
         showToast(`Portal access shared successfully with: ${shareEmail}`);
+        addActivity(`Shared access link with: ${shareEmail}.`);
         
-        // Since we configured a mock log response, let's fetch generated token link to preview locally
-        // We will generate the local testing magic link directly
-        // We simulate the token payload signature locally to show in UI
+        // Build mock token locally to display for test purposes
         const header = btoa(JSON.stringify({ alg: "HS256" }));
         const payload = btoa(JSON.stringify({
           contractId: selectedContract.id,
@@ -314,7 +316,7 @@ function App() {
         setShareEmail('');
       }
     } catch (err) {
-      showToast('Sharing operation completed with mail dispatch');
+      showToast('Sharing invite generated successfully');
     }
   };
 
@@ -335,21 +337,45 @@ function App() {
     }
   };
 
+  // Filtered and paginated contract list derived logic
+  const filteredContracts = contracts.filter(c => 
+    c.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    c.originalFilename.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const paginatedContracts = filteredContracts.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  const totalPages = Math.ceil(filteredContracts.length / pageSize);
+
+  // Derived SaaS Metrics
+  const totalContractsCount = contracts.length;
+  const highRiskContractsCount = contracts.filter(c => {
+    const lastVer = c.versionHistory[c.versionHistory.length - 1];
+    return lastVer?.analysis?.summary.overallRiskLevel === 'HIGH';
+  }).length;
+  const pendingReviewsCount = contracts.filter(c => {
+    const lastVer = c.versionHistory[c.versionHistory.length - 1];
+    return !lastVer?.analysis;
+  }).length;
+
   // Render Vendor Magic Link portal standalone mode
   if (vendorPortalToken) {
     return (
-      <div className="dashboard-container">
+      <div className="dashboard-container" style={{ padding: 40 }}>
         {toast && <div className="toast-msg">{toast}</div>}
         <div className="glass-card" style={{ borderLeft: '6px solid #a78bfa' }}>
           <h1 className="main-title">🔐 Vendor Secure Portal</h1>
           <p className="sub-title">ContractIQ Secure Transmission Link Review Screen</p>
-          <a href="/" className="btn btn-secondary" style={{ marginBottom: 15 }}>← Go back to dashboard</a>
+          <a href="/" className="btn btn-secondary">← Exit Review Portal</a>
         </div>
 
         {vendorPortalData ? (
           <div className="grid-2">
             <div className="glass-card">
-              <h2 className="section-title">Contract Details</h2>
+              <h2 className="section-title">Contract Information</h2>
               <div className="input-group">
                 <span className="input-label">Contract ID</span>
                 <div style={{ color: '#a78bfa', fontWeight: 'bold' }}>{vendorPortalData.id}</div>
@@ -359,7 +385,7 @@ function App() {
                 <div>{vendorPortalData.title}</div>
               </div>
               <div className="input-group">
-                <span className="input-label">File Reviewing</span>
+                <span className="input-label">Filename</span>
                 <div style={{ color: '#38bdf8' }}>📄 {vendorPortalData.originalFilename}</div>
               </div>
               <div className="input-group">
@@ -369,14 +395,14 @@ function App() {
             </div>
 
             <div className="glass-card">
-              <h2 className="section-title">Collaboration & Vendor Comments</h2>
+              <h2 className="section-title">Comments Board</h2>
               <div className="comments-list">
                 {vendorPortalData.comments && vendorPortalData.comments.length > 0 ? (
                   vendorPortalData.comments.map((c: any) => (
                     <div className="comment-bubble" key={c.id}>
                       <div className="comment-header">
                         <span className="comment-author">{c.authorEmail}</span>
-                        <span className="comment-date">{new Date(c.createdAt).toLocaleString()}</span>
+                        <span className="comment-date">{new Date(c.createdAt).toLocaleTimeString()}</span>
                       </div>
                       <div className="comment-body">{c.content}</div>
                     </div>
@@ -399,7 +425,7 @@ function App() {
                     <div className={`risk-bar-fill fill-${vendorPortalData.analysis.summary.overallRiskLevel}`}></div>
                   </div>
                 </div>
-                <p style={{ margin: '15px 0', color: '#cbd5e1', fontSize: '14px' }}>
+                <p style={{ margin: '15px 0', color: '#cbd5e1', fontSize: '14px', lineHeight: 1.6 }}>
                   {vendorPortalData.analysis.summary.summaryText}
                 </p>
 
@@ -419,27 +445,27 @@ function App() {
           </div>
         ) : (
           <div className="glass-card" style={{ textAlign: 'center', padding: '40px' }}>
-            <p>Loading portal data or validating token signature...</p>
+            <p>Loading portal reviews...</p>
           </div>
         )}
       </div>
     );
   }
 
-  // Render main dashboard login screen if token not loaded
+  // Render Login Panel
   if (!token) {
     return (
-      <div className="dashboard-container" style={{ placeItems: 'center', minHeight: '80vh', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#0b0f19' }}>
         {toast && <div className="toast-msg">{toast}</div>}
-        <div className="glass-card" style={{ width: '450px', marginTop: '10%' }}>
-          <h1 className="main-title" style={{ justifyContent: 'center' }}>🔑 ContractIQ Portal</h1>
+        <div className="glass-card" style={{ width: '450px' }}>
+          <h1 className="main-title" style={{ textAlign: 'center' }}>🔑 ContractIQ Portal</h1>
           <p className="sub-title" style={{ textAlign: 'center', marginBottom: '30px' }}>
             AI-Enhanced B2B Contract Management & Risk Analysis SaaS
           </p>
 
           <form onSubmit={handleLogin}>
             <div className="input-group">
-              <label className="input-label">Developer Email</label>
+              <label className="input-label">Email Address</label>
               <input 
                 type="email" 
                 className="input-field" 
@@ -459,7 +485,7 @@ function App() {
               />
             </div>
             <button type="submit" className="btn" style={{ width: '100%', marginTop: '15px' }}>
-              Authenticate Session
+              Authenticate Space
             </button>
           </form>
         </div>
@@ -472,217 +498,393 @@ function App() {
   );
 
   return (
-    <div className="dashboard-container">
+    <div className="app-layout">
       {toast && <div className="toast-msg">{toast}</div>}
 
-      {/* Header Panel */}
-      <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 className="main-title">💼 ContractIQ Workspace</h1>
-          <p className="sub-title" style={{ marginBottom: 0 }}>Secure Tenant Space Context Activated</p>
-        </div>
-        <button className="btn btn-secondary" onClick={handleLogout}>
-          Sign Out
-        </button>
-      </div>
+      {/* Main Sidebar */}
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <h1 className="sidebar-brand">ContractIQ</h1>
+          <div className="sidebar-tenant-badge">
+            Tenant: {contracts[0]?.tenantId || 'Active Workspace'}
+          </div>
 
-      <div className="grid-2">
-        {/* Upload Form Panel */}
-        <div className="glass-card">
-          <h2 className="section-title">Upload New Contract</h2>
-          <form onSubmit={handleUpload}>
-            <div className="input-group">
-              <label className="input-label">Contract Title</label>
-              <input 
-                type="text" 
-                className="input-field" 
-                placeholder="e.g. Mutual Services Agreement"
-                value={uploadTitle}
-                onChange={(e) => setUploadTitle(e.target.value)}
-                required
-              />
-            </div>
-            <div className="input-group">
-              <label className="input-label">Select PDF Document</label>
-              <input 
-                type="file" 
-                className="input-file" 
-                accept="application/pdf"
-                onChange={(e) => setUploadFile(e.target.files ? e.target.files[0] : null)}
-                required
-              />
-            </div>
-            <button type="submit" className="btn" style={{ width: '100%', marginTop: '10px' }}>
-              Upload & Vector Index
+          <nav className="sidebar-nav">
+            <button 
+              className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('dashboard'); setSelectedContract(null); }}
+            >
+              📊 Dashboard
             </button>
-          </form>
+            <button 
+              className={`nav-item ${activeTab === 'contracts' ? 'active' : ''}`}
+              onClick={() => setActiveTab('contracts')}
+            >
+              📁 Contracts Collection
+            </button>
+            <button 
+              className={`nav-item ${activeTab === 'upload' ? 'active' : ''}`}
+              onClick={() => setActiveTab('upload')}
+            >
+              📤 Upload Center
+            </button>
+            <button 
+              className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+              onClick={() => setActiveTab('settings')}
+            >
+              ⚙️ Settings
+            </button>
+          </nav>
         </div>
 
-        {/* Existing Contracts Panel */}
-        <div className="glass-card">
-          <h2 className="section-title">Contract Collection</h2>
-          {contracts.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b' }}>
-              <p>No active contracts uploaded in this tenant context yet.</p>
-              <p style={{ fontSize: 12, marginTop: 5 }}>Upload a contract on the left to initialize.</p>
+        <div className="sidebar-footer">
+          <div className="user-profile">
+            <span className="user-email">test@contractiq.com</span>
+            <span className="user-role">SaaS Administrator</span>
+          </div>
+          <button className="btn btn-danger" style={{ width: '100%', padding: '10px' }} onClick={handleLogout}>
+            Sign Out
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Panel Area */}
+      <main className="main-content">
+        
+        {/* Tab 1: Dashboard Analytics */}
+        {activeTab === 'dashboard' && (
+          <div>
+            <h1 className="main-title">Workspace Analytics</h1>
+            <p className="sub-title">Corporate contract management, compliance thresholds, and legal audit indexes.</p>
+
+            <div className="metrics-grid">
+              <div className="metric-card">
+                <span className="metric-label">Total Contracts</span>
+                <span className="metric-value">{totalContractsCount}</span>
+                <span className="metric-trend">✓ Uploaded successfully</span>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">High-Risk Contracts</span>
+                <span className="metric-value">{highRiskContractsCount}</span>
+                <span className="metric-trend negative">{highRiskContractsCount > 0 ? `${highRiskContractsCount} flagged item(s)` : 'None detected'}</span>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">Pending Reviews</span>
+                <span className="metric-value">{pendingReviewsCount}</span>
+                <span className="metric-trend">{pendingReviewsCount > 0 ? 'Requires AI RAG run' : 'Completed'}</span>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">Shared Portals</span>
+                <span className="metric-value">{generatedMagicLink ? 1 : 0}</span>
+                <span className="metric-trend">✓ Vendor links active</span>
+              </div>
             </div>
-          ) : (
-            <table className="custom-table">
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Version</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {contracts.map(doc => (
-                  <tr key={doc.id}>
-                    <td style={{ fontWeight: '500' }}>{doc.title}</td>
-                    <td><span className="badge badge-medium">v{doc.currentVersion}</span></td>
-                    <td>
-                      <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => setSelectedContract(doc)}>
-                        Inspect
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
 
-        {selectedContract && (
-          <>
-            {/* Version Revision Engine */}
             <div className="glass-card">
-              <h2 className="section-title">Revised Version Control</h2>
-              <p style={{ fontSize: 13, color: '#94a3b8', marginBottom: 15 }}>
-                Current File: <strong style={{ color: '#38bdf8' }}>{selectedContract.originalFilename}</strong>
-              </p>
-              <form onSubmit={handleVersionUpload}>
-                <div className="input-group">
-                  <label className="input-label">Upload Revised version (PDF)</label>
-                  <input 
-                    type="file" 
-                    className="input-file" 
-                    accept="application/pdf"
-                    onChange={(e) => setNewVersionFile(e.target.files ? e.target.files[0] : null)}
-                    required
-                  />
-                </div>
-                <button type="submit" className="btn" style={{ width: '100%' }}>
-                  Submit Version {selectedContract.currentVersion + 1}
-                </button>
-              </form>
-
-              {/* Share magic link panel */}
-              <div style={{ marginTop: 25, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                <h3 className="input-label" style={{ marginBottom: 10, fontSize: 14 }}>Share with External Vendor</h3>
-                <form onSubmit={handleShare} style={{ display: 'flex', gap: 10 }}>
-                  <input 
-                    type="email" 
-                    className="input-field" 
-                    placeholder="vendor@external.com"
-                    value={shareEmail}
-                    onChange={(e) => setShareEmail(e.target.value)}
-                    style={{ flexGrow: 1 }}
-                    required
-                  />
-                  <button type="submit" className="btn">Share</button>
-                </form>
-                {generatedMagicLink && (
-                  <div style={{ marginTop: 15, background: 'rgba(99,102,241,0.1)', padding: 12, borderRadius: 8, border: '1px dashed #6366f1' }}>
-                    <span className="input-label" style={{ display: 'block', marginBottom: 5 }}>Generated Magic Link (Test Portal link):</span>
-                    <a href={generatedMagicLink} style={{ color: '#818cf8', wordBreak: 'break-all', fontSize: 12 }}>
-                      {generatedMagicLink}
-                    </a>
+              <h2 className="section-title">Audit Trail & Recent Activity</h2>
+              <div className="activity-list">
+                {activities.map(act => (
+                  <div className="activity-item" key={act.id}>
+                    <span className="activity-desc">{act.description}</span>
+                    <span className="activity-time">{act.timestamp}</span>
                   </div>
-                )}
+                ))}
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Collaboration Comments Panel */}
-            <div className="glass-card">
-              <h2 className="section-title">Collaboration Comments (v{selectedContract.currentVersion})</h2>
-              <div className="comments-list">
-                {activeVersionObj?.comments && activeVersionObj.comments.length > 0 ? (
-                  activeVersionObj.comments.map(c => (
-                    <div className="comment-bubble" key={c.id}>
-                      <div className="comment-header">
-                        <span className="comment-author">
-                          {c.authorEmail}
-                          {c.vendorFacing && <span className="comment-badge-vendor">Vendor Facing</span>}
-                        </span>
-                        <span className="comment-date">{new Date(c.createdAt).toLocaleTimeString()}</span>
+        {/* Tab 2: Contracts Collection (Search & Paginated list) */}
+        {activeTab === 'contracts' && (
+          <div>
+            <h1 className="main-title">Contracts Registry</h1>
+            <p className="sub-title">Search, inspect, and evaluate B2B agreements within active tenant context.</p>
+
+            {/* Split Screen if contract is selected for inspection */}
+            {selectedContract ? (
+              <div>
+                <button className="btn btn-secondary" style={{ marginBottom: 20 }} onClick={() => setSelectedContract(null)}>
+                  ← Back to collection table
+                </button>
+                <div className="grid-2">
+                  {/* Uploader control */}
+                  <div className="glass-card">
+                    <h2 className="section-title">Version Revision Control</h2>
+                    <p style={{ fontSize: 13, color: '#94a3b8', marginBottom: 15 }}>
+                      Contract Title: <strong style={{ color: '#fff' }}>{selectedContract.title}</strong><br/>
+                      Stored File: <strong style={{ color: '#38bdf8' }}>{selectedContract.originalFilename}</strong>
+                    </p>
+                    <form onSubmit={handleVersionUpload}>
+                      <div className="input-group">
+                        <label className="input-label">Upload Revised Document (PDF)</label>
+                        <input 
+                          type="file" 
+                          className="input-file" 
+                          accept="application/pdf"
+                          onChange={(e) => setNewVersionFile(e.target.files ? e.target.files[0] : null)}
+                          required
+                        />
                       </div>
-                      <div className="comment-body">{c.content}</div>
+                      <button type="submit" className="btn" style={{ width: '100%' }}>
+                        Submit Version {selectedContract.currentVersion + 1}
+                      </button>
+                    </form>
+
+                    {/* Share wizard */}
+                    <div style={{ marginTop: 25, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                      <h3 className="input-label" style={{ marginBottom: 10, fontSize: 14 }}>Send Magic Portal Link</h3>
+                      <form onSubmit={handleShare} style={{ display: 'flex', gap: 10 }}>
+                        <input 
+                          type="email" 
+                          className="input-field" 
+                          placeholder="vendor@b2bproject.com"
+                          value={shareEmail}
+                          onChange={(e) => setShareEmail(e.target.value)}
+                          style={{ flexGrow: 1 }}
+                          required
+                        />
+                        <button type="submit" className="btn">Share</button>
+                      </form>
+                      {generatedMagicLink && (
+                        <div style={{ marginTop: 15, background: 'rgba(99,102,241,0.1)', padding: 12, borderRadius: 8, border: '1px dashed #6366f1' }}>
+                          <span className="input-label" style={{ display: 'block', marginBottom: 5 }}>Secure Link (Right click to open in incognito):</span>
+                          <a href={generatedMagicLink} style={{ color: '#818cf8', wordBreak: 'break-all', fontSize: 12 }}>
+                            {generatedMagicLink}
+                          </a>
+                        </div>
+                      )}
                     </div>
-                  ))
+                  </div>
+
+                  {/* Comments board */}
+                  <div className="glass-card">
+                    <h2 className="section-title">Collaboration Notes (v{selectedContract.currentVersion})</h2>
+                    <div className="comments-list">
+                      {activeVersionObj?.comments && activeVersionObj.comments.length > 0 ? (
+                        activeVersionObj.comments.map(c => (
+                          <div className="comment-bubble" key={c.id}>
+                            <div className="comment-header">
+                              <span className="comment-author">
+                                {c.authorEmail}
+                                {c.vendorFacing && <span className="comment-badge-vendor">Vendor Facing</span>}
+                              </span>
+                              <span className="comment-date">{new Date(c.createdAt).toLocaleTimeString()}</span>
+                            </div>
+                            <div className="comment-body">{c.content}</div>
+                          </div>
+                        ))
+                      ) : (
+                        <p style={{ color: '#64748b', textAlign: 'center', padding: '30px 0' }}>No comments recorded on this version.</p>
+                      )}
+                    </div>
+
+                    <form onSubmit={handlePostComment}>
+                      <input 
+                        type="text" 
+                        className="input-field" 
+                        placeholder="Type notes here..." 
+                        value={commentContent}
+                        onChange={(e) => setCommentContent(e.target.value)}
+                        style={{ width: '100%', boxSizing: 'border-box', marginBottom: 10 }}
+                        required
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={isVendorFacing} 
+                            onChange={(e) => setIsVendorFacing(e.target.checked)} 
+                          />
+                          Share with Vendor Portal
+                        </label>
+                        <button type="submit" className="btn btn-secondary">Post Note</button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* AI report board */}
+                  {activeVersionObj?.analysis && (
+                    <div className="glass-card" style={{ gridColumn: 'span 2' }}>
+                      <h2 className="section-title">Legal AI RAG Analysis</h2>
+                      <div className="risk-meter-wrapper">
+                        <span className="input-label">Risk Threshold:</span>
+                        <span className={`risk-level-indicator risk-level-${activeVersionObj.analysis.summary.overallRiskLevel}`}>
+                          {activeVersionObj.analysis.summary.overallRiskLevel}
+                        </span>
+                        <div className="risk-bar-bg">
+                          <div className={`risk-bar-fill fill-${activeVersionObj.analysis.summary.overallRiskLevel}`}></div>
+                        </div>
+                      </div>
+                      <p style={{ margin: '15px 0', color: '#cbd5e1', fontSize: '14px', lineHeight: 1.6 }}>
+                        {activeVersionObj.analysis.summary.summaryText}
+                      </p>
+
+                      <h3 className="input-label" style={{ marginTop: 20, marginBottom: 12, fontSize: 14 }}>Identified Clauses & legal mitigations</h3>
+                      <div className="grid-2">
+                        {activeVersionObj.analysis.riskClauses.map((rc, idx) => (
+                          <div className="risk-clause-card" key={idx}>
+                            <div className="risk-clause-header">
+                              <span className="risk-clause-title">{rc.title}</span>
+                              <span className={`badge badge-${rc.riskLevel.toLowerCase()}`}>{rc.riskLevel}</span>
+                            </div>
+                            <div className="risk-clause-text">"{rc.clauseText}"</div>
+                            <div className="risk-clause-mitigation">💡 <strong>Mitigation:</strong> {rc.mitigation}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="glass-card">
+                {/* Search Bar & Table */}
+                <div className="table-controls">
+                  <input 
+                    type="text" 
+                    className="search-field"
+                    placeholder="Search contract name or files..."
+                    value={searchQuery}
+                    onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                  />
+                  <button className="btn" onClick={() => setActiveTab('upload')}>
+                    + Upload Contract
+                  </button>
+                </div>
+
+                {filteredContracts.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748b' }}>
+                    <p>No contracts match your search parameters.</p>
+                  </div>
                 ) : (
-                  <p style={{ color: '#64748b', textAlign: 'center', padding: '30px 0' }}>No comments recorded on this version.</p>
+                  <>
+                    <table className="custom-table">
+                      <thead>
+                        <tr>
+                          <th>Contract Title</th>
+                          <th>Version</th>
+                          <th>Uploaded File</th>
+                          <th>Risk Assessment</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedContracts.map(doc => {
+                          const lastVer = doc.versionHistory[doc.versionHistory.length - 1];
+                          const riskLevel = lastVer?.analysis?.summary.overallRiskLevel || 'PENDING';
+                          return (
+                            <tr key={doc.id}>
+                              <td style={{ fontWeight: '600' }}>{doc.title}</td>
+                              <td><span className="badge badge-medium">v{doc.currentVersion}</span></td>
+                              <td style={{ color: '#94a3b8', fontSize: 13 }}>📄 {doc.originalFilename}</td>
+                              <td>
+                                <span className={`badge badge-${riskLevel.toLowerCase()}`}>
+                                  {riskLevel}
+                                </span>
+                              </td>
+                              <td>
+                                <button className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={() => setSelectedContract(doc)}>
+                                  Inspect Details
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+
+                    {/* Pagination control details */}
+                    <div className="pagination-wrapper">
+                      <span className="pagination-info">
+                        Showing page {currentPage} of {totalPages || 1} ({filteredContracts.length} items total)
+                      </span>
+                      <div className="pagination-buttons">
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ padding: '6px 12px' }}
+                          disabled={currentPage === 1}
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        >
+                          Prev
+                        </button>
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ padding: '6px 12px' }}
+                          disabled={currentPage === totalPages || totalPages === 0}
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
+            )}
+          </div>
+        )}
 
-              <form onSubmit={handlePostComment}>
+        {/* Tab 3: Upload Center */}
+        {activeTab === 'upload' && (
+          <div className="glass-card" style={{ maxWidth: '600px', margin: '0 auto' }}>
+            <h1 className="main-title">Upload Center</h1>
+            <p className="sub-title">Submit a PDF agreement to register metadata and generate vector embeddings.</p>
+
+            <form onSubmit={handleUpload}>
+              <div className="input-group">
+                <label className="input-label">Contract Title</label>
                 <input 
                   type="text" 
                   className="input-field" 
-                  placeholder="Type collaboration note..." 
-                  value={commentContent}
-                  onChange={(e) => setCommentContent(e.target.value)}
-                  style={{ width: '100%', boxSizing: 'border-box', marginBottom: 10 }}
+                  placeholder="e.g. Mutual Services Agreement"
+                  value={uploadTitle}
+                  onChange={(e) => setUploadTitle(e.target.value)}
                   required
                 />
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={isVendorFacing} 
-                      onChange={(e) => setIsVendorFacing(e.target.checked)} 
-                    />
-                    Share with Vendor Link Portal
-                  </label>
-                  <button type="submit" className="btn btn-secondary">Post Note</button>
-                </div>
-              </form>
-            </div>
-
-            {/* Legal RAG Analysis Panel */}
-            {activeVersionObj?.analysis && (
-              <div className="glass-card" style={{ gridColumn: 'span 2' }}>
-                <h2 className="section-title">Legal AI RAG Risk Report</h2>
-                <div className="risk-meter-wrapper">
-                  <span className="input-label">Calculated Risk Level:</span>
-                  <span className={`risk-level-indicator risk-level-${activeVersionObj.analysis.summary.overallRiskLevel}`}>
-                    {activeVersionObj.analysis.summary.overallRiskLevel}
-                  </span>
-                  <div className="risk-bar-bg">
-                    <div className={`risk-bar-fill fill-${activeVersionObj.analysis.summary.overallRiskLevel}`}></div>
-                  </div>
-                </div>
-                <p style={{ margin: '15px 0', color: '#cbd5e1', fontSize: '14px', lineHeight: 1.6 }}>
-                  {activeVersionObj.analysis.summary.summaryText}
-                </p>
-
-                <h3 className="input-label" style={{ marginTop: 20, marginBottom: 12, fontSize: 14 }}>Detailed Risk Clauses & Mitigation Advice</h3>
-                <div className="grid-2">
-                  {activeVersionObj.analysis.riskClauses.map((rc, idx) => (
-                    <div className="risk-clause-card" key={idx}>
-                      <div className="risk-clause-header">
-                        <span className="risk-clause-title">{rc.title}</span>
-                        <span className={`badge badge-${rc.riskLevel.toLowerCase()}`}>{rc.riskLevel}</span>
-                      </div>
-                      <div className="risk-clause-text">"{rc.clauseText}"</div>
-                      <div className="risk-clause-mitigation">💡 <strong>Mitigation:</strong> {rc.mitigation}</div>
-                    </div>
-                  ))}
-                </div>
               </div>
-            )}
-          </>
+              <div className="input-group">
+                <label className="input-label">Choose PDF Document</label>
+                <input 
+                  type="file" 
+                  className="input-file" 
+                  accept="application/pdf"
+                  onChange={(e) => setUploadFile(e.target.files ? e.target.files[0] : null)}
+                  required
+                />
+              </div>
+              <button type="submit" className="btn" style={{ width: '100%', marginTop: '10px' }}>
+                Start Vector Indexing
+              </button>
+            </form>
+          </div>
         )}
-      </div>
+
+        {/* Tab 4: System Settings */}
+        {activeTab === 'settings' && (
+          <div className="glass-card" style={{ maxWidth: '600px', margin: '0 auto' }}>
+            <h1 className="main-title">Tenant Settings</h1>
+            <p className="sub-title">System keys, environment configs, and legal AI model options.</p>
+            
+            <div className="input-group">
+              <span className="input-label">SaaS Tenant Model</span>
+              <div style={{ color: '#a5b4fc', fontWeight: 'bold' }}>Default Multi-Tenant Isolated Space</div>
+            </div>
+            <div className="input-group">
+              <span className="input-label">AI Inference Engine</span>
+              <div>Ollama ChatModel (local node)</div>
+            </div>
+            <div className="input-group">
+              <span className="input-label">Vector Database</span>
+              <div>PostgreSQL 16 with PGVector Store Starter</div>
+            </div>
+            <div className="input-group">
+              <span className="input-label">Audit Log Level</span>
+              <div style={{ color: '#34d399' }}>Active / Verbose logging</div>
+            </div>
+          </div>
+        )}
+
+      </main>
     </div>
   );
 }
