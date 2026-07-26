@@ -21,10 +21,27 @@ public class VectorIndexingService {
 
     private final PdfParsingService pdfParsingService;
     private final VectorStore vectorStore;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
-    public VectorIndexingService(PdfParsingService pdfParsingService, VectorStore vectorStore) {
+    public VectorIndexingService(
+            PdfParsingService pdfParsingService, 
+            VectorStore vectorStore,
+            org.springframework.jdbc.core.JdbcTemplate jdbcTemplate
+    ) {
         this.pdfParsingService = pdfParsingService;
         this.vectorStore = vectorStore;
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public void deleteContractVectors(String contractId) {
+        log.info("Deleting vectors for contractId: {}", contractId);
+        try {
+            String sql = "DELETE FROM vector_store WHERE metadata->>'contractId' = ?";
+            int rowsDeleted = jdbcTemplate.update(sql, contractId);
+            log.info("Deleted {} vector chunks matching contractId: {}", rowsDeleted, contractId);
+        } catch (Exception e) {
+            log.error("Error deleting vectors from store for contractId: {}", contractId, e);
+        }
     }
 
     public void indexContract(String contractId, String tenantId, String filePath, int versionNumber) {

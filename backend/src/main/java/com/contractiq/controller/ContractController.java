@@ -31,6 +31,8 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -191,7 +193,7 @@ public class ContractController {
     }
 
     @PostMapping("/{id}/share")
-    public ResponseEntity<Void> shareContract(
+    public ResponseEntity<Map<String, String>> shareContract(
             @PathVariable("id") String id,
             @RequestParam("email") String email
     ) {
@@ -215,7 +217,11 @@ public class ContractController {
         
         emailNotificationService.sendVendorPortalLink(email, contractDoc.getTitle(), magicLink);
 
-        return ResponseEntity.ok().build();
+        Map<String, String> response = new HashMap<>();
+        response.put("token", secureToken);
+        response.put("magicLink", magicLink);
+
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{id}/comments")
@@ -412,6 +418,47 @@ public class ContractController {
         log.info("Successfully uploaded, indexed, and analyzed new version {} for contract {}", nextVersion, id);
 
         return ResponseEntity.ok(savedDoc);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteContract(@PathVariable("id") String id) {
+        log.info("Received request to delete contract ID: {}", id);
+
+        String tenantId = TenantContext.getTenantId();
+        if (tenantId == null || tenantId.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing tenant context");
+        }
+
+        ContractDocument contractDoc = contractDocumentRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found"));
+
+        if (!tenantId.equals(contractDoc.getTenantId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
+        }
+
+        // 1. Delete file on disk
+        if (contractDoc.getStoredFilePath() != null) {
+            try {
+                Path filePath = Paths.get(contractDoc.getStoredFilePath());
+                Files.deleteIfExists(filePath);
+                log.info("Successfully deleted contract file from disk: {}", filePath);
+            } catch (Exception e) {
+                log.error("Failed to delete contract file from disk", e);
+            }
+        }
+
+        // 2. Delete vector embeddings
+        try {
+            vectorIndexingService.deleteContractVectors(id);
+        } catch (Exception e) {
+            log.error("Failed to delete vector embeddings for contract: {}", id, e);
+        }
+
+        // 3. Delete metadata from MongoDB
+        contractDocumentRepository.delete(contractDoc);
+        log.info("Successfully deleted contract document from MongoDB: {}", id);
+
+        return ResponseEntity.noContent().build();
     }
 
     private void validateMultipartFile(MultipartFile file) {
