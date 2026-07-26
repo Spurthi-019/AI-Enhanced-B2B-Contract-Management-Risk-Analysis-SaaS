@@ -286,6 +286,32 @@ function App() {
     }
   };
 
+  // Delete contract
+  const handleDeleteContract = async (contractId: string) => {
+    if (!window.confirm('Are you sure you want to delete this contract? This will permanently remove all versions, collaboration notes, and AI vector embeddings.')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/contracts/${contractId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        showToast('Contract deleted successfully!');
+        addActivity('Contract removed from workspace.');
+        setContracts(prev => prev.filter(c => c.id !== contractId));
+        if (selectedContract?.id === contractId) {
+          setSelectedContract(null);
+        }
+      } else {
+        showToast('Failed to delete contract. Access denied.');
+      }
+    } catch (err) {
+      showToast('Network error deleting contract');
+    }
+  };
+
   // Share contract via email magic portal link
   const handleShare = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -297,22 +323,10 @@ function App() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
+        const data = await res.json();
         showToast(`Portal access shared successfully with: ${shareEmail}`);
         addActivity(`Shared access link with: ${shareEmail}.`);
-        
-        // Build mock token locally to display for test purposes
-        const header = btoa(JSON.stringify({ alg: "HS256" }));
-        const payload = btoa(JSON.stringify({
-          contractId: selectedContract.id,
-          tenantId: selectedContract.tenantId,
-          vendorEmail: shareEmail,
-          isVendor: true,
-          sub: shareEmail,
-          iat: Math.floor(Date.now() / 1000),
-          exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
-        })).replace(/=/g, '');
-        const mockToken = `${header}.${payload}.mockSignatureKey`;
-        setGeneratedMagicLink(`http://localhost:5173/?token=${mockToken}`);
+        setGeneratedMagicLink(data.magicLink);
         setShareEmail('');
       }
     } catch (err) {
@@ -630,6 +644,16 @@ function App() {
                       </button>
                     </form>
 
+                    <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                      <button 
+                        className="btn btn-danger" 
+                        style={{ width: '100%', padding: '10px' }} 
+                        onClick={() => handleDeleteContract(selectedContract.id)}
+                      >
+                        🗑️ Delete Entire Contract
+                      </button>
+                    </div>
+
                     {/* Share wizard */}
                     <div style={{ marginTop: 25, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                       <h3 className="input-label" style={{ marginBottom: 10, fontSize: 14 }}>Send Magic Portal Link</h3>
@@ -783,9 +807,14 @@ function App() {
                                 </span>
                               </td>
                               <td>
-                                <button className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={() => setSelectedContract(doc)}>
-                                  Inspect Details
-                                </button>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <button className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={() => setSelectedContract(doc)}>
+                                    Inspect Details
+                                  </button>
+                                  <button className="btn btn-danger" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={() => handleDeleteContract(doc.id)}>
+                                    🗑️ Delete
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );

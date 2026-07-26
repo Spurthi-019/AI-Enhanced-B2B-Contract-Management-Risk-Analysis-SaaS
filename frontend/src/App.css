@@ -305,6 +305,16 @@ body {
   box-shadow: none;
 }
 
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border: none;
+}
+
+.btn-danger:hover {
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
 /* Table controls & Search */
 .table-controls {
   display: flex;
