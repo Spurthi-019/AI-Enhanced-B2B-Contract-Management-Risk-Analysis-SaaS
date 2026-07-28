@@ -30,6 +30,13 @@ services:
     volumes:
       - ollama_data:/root/.ollama
 
+  maildev:
+    image: maildev/maildev:latest
+    container_name: contractiq-maildev
+    ports:
+      - "1080:1080"
+      - "1025:1025"
+
 volumes:
   postgres_data:
   mongo_data:
