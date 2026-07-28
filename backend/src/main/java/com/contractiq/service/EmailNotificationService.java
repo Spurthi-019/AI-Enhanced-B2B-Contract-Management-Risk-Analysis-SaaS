@@ -35,7 +35,7 @@ public class EmailNotificationService {
                     <p>You have been invited to review the contract: <strong>%s</strong>.</p>
                     <p>Please click the button below to securely access the review portal (active for 7 days):</p>
                     <div style="margin: 25px 0;">
-                        <a href="%s" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Access Review Portal</a>
+                        <a href="%s" target="_blank" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Access Review Portal</a>
                     </div>
                     <p style="color: #7f8c8d; font-size: 12px;">This is an automated security transmission from ContractIQ.</p>
                 </body>
@@ -73,7 +73,7 @@ public class EmailNotificationService {
                         %s
                     </div>
                     <div style="margin: 25px 0;">
-                        <a href="http://localhost:5173" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Login to Workspace</a>
+                        <a href="http://localhost:5173" target="_blank" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Login to Workspace</a>
                     </div>
                     <p style="color: #7f8c8d; font-size: 12px;">This is an automated notification from ContractIQ.</p>
                 </body>
