@@ -95,6 +95,12 @@ function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showCommentsSidebar, setShowCommentsSidebar] = useState(true);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [registerCompany, setRegisterCompany] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('EMPLOYEE');
 
   useEffect(() => {
     const handleLocationChange = () => {
@@ -414,6 +420,65 @@ function App() {
     }
   };
 
+  // Register Company / Tenant onboarding
+  const handleRegisterCompany = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/auth/register-company`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyName: registerCompany,
+          email: registerEmail,
+          password: registerPassword
+        })
+      });
+      if (res.ok) {
+        showToast('Company registered successfully! Please log in.');
+        setRegisterCompany('');
+        setRegisterEmail('');
+        setRegisterPassword('');
+        navigate('/login');
+      } else {
+        const errText = await res.text();
+        showToast(`Registration failed: ${errText || 'Invalid details'}`);
+      }
+    } catch (err) {
+      showToast('Network error during registration');
+    }
+  };
+
+  // Invite Team Member
+  const handleInviteTeamSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteEmail) return;
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/tenants/invite`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: inviteEmail,
+          role: inviteRole
+        })
+      });
+      if (res.ok) {
+        showToast(`Invitation sent successfully to ${inviteEmail}!`);
+        addActivity(`Invited ${inviteEmail} as ${inviteRole}.`);
+        setInviteEmail('');
+        setShowInviteModal(false);
+      } else {
+        const errText = await res.text();
+        showToast(`Failed to send invitation: ${errText || 'Access Denied'}`);
+      }
+    } catch (err) {
+      showToast('Network error sending invitation');
+    }
+  };
+
   // Vendor Portal Standalone loading
   const loadVendorPortalData = async (portalToken: string) => {
     try {
@@ -618,6 +683,72 @@ function App() {
     );
   }
 
+  // Render Register Page
+  if (!token && currentPath === '/register') {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#0b0f19' }}>
+        {toast && <div className="toast-msg">{toast}</div>}
+        <div className="glass-card" style={{ width: '450px' }}>
+          <h1 className="main-title" style={{ textAlign: 'center' }}>🏢 Register Company</h1>
+          <p className="sub-title" style={{ textAlign: 'center', marginBottom: '30px' }}>
+            Set up a secure B2B tenant workspace and register the administrator account
+          </p>
+
+          <form onSubmit={handleRegisterCompany}>
+            <div className="input-group">
+              <label className="input-label">Company / Tenant Name</label>
+              <input 
+                type="text" 
+                className="input-field" 
+                placeholder="e.g. Acme Corp"
+                value={registerCompany} 
+                onChange={(e) => setRegisterCompany(e.target.value)} 
+                required 
+              />
+            </div>
+
+            <div className="input-group">
+              <label className="input-label">Admin Email Address</label>
+              <input 
+                type="email" 
+                className="input-field" 
+                placeholder="admin@company.com"
+                value={registerEmail} 
+                onChange={(e) => setRegisterEmail(e.target.value)} 
+                required 
+              />
+            </div>
+
+            <div className="input-group" style={{ marginBottom: 25 }}>
+              <label className="input-label">Password</label>
+              <input 
+                type="password" 
+                className="input-field" 
+                value={registerPassword} 
+                onChange={(e) => setRegisterPassword(e.target.value)} 
+                required 
+              />
+            </div>
+
+            <button type="submit" className="btn" style={{ width: '100%', padding: '12px', fontSize: '15px' }}>
+              Register Workspace & Admin
+            </button>
+
+            <div style={{ marginTop: 20, textAlign: 'center' }}>
+              <a 
+                href="/login" 
+                onClick={(e) => { e.preventDefault(); navigate('/login'); }} 
+                style={{ color: '#a78bfa', textDecoration: 'none', fontSize: 13 }}
+              >
+                Already have a company? Sign In
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   // Render Login Panel
   if (!token) {
     return (
@@ -653,6 +784,15 @@ function App() {
             <button type="submit" className="btn" style={{ width: '100%', marginTop: '15px' }}>
               Authenticate Space
             </button>
+            <div style={{ marginTop: 20, textAlign: 'center' }}>
+              <a 
+                href="/register" 
+                onClick={(e) => { e.preventDefault(); navigate('/register'); }} 
+                style={{ color: '#a78bfa', textDecoration: 'none', fontSize: 13 }}
+              >
+                Register a new company workspace
+              </a>
+            </div>
           </form>
         </div>
       </div>
@@ -733,6 +873,60 @@ function App() {
         </div>
       )}
 
+      {/* Invite Team Modal */}
+      {showInviteModal && (
+        <div className="modal-backdrop">
+          <div className="modal-content glass-card" style={{ maxWidth: '450px', width: '90%' }}>
+            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 15, marginBottom: 20 }}>
+              <h2 className="section-title" style={{ margin: 0 }}>➕ Invite Team Member</h2>
+              <button 
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18 }}
+                onClick={() => { setShowInviteModal(false); setInviteEmail(''); }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <p style={{ color: '#94a3b8', fontSize: 13, lineHeight: 1.5, marginBottom: 20 }}>
+              Invite an employee or legal counsel to join your active tenant workspace. They will receive an email containing a temporary password (`welcome123`) to log in immediately.
+            </p>
+
+            <form onSubmit={handleInviteTeamSubmit}>
+              <div className="input-group" style={{ marginBottom: 15 }}>
+                <label className="input-label">Member Email Address</label>
+                <input 
+                  type="email" 
+                  className="input-field" 
+                  placeholder="collaborator@company.com" 
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  required
+                />
+              </div>
+
+              <div className="input-group" style={{ marginBottom: 20 }}>
+                <label className="input-label">Workspace Access Role</label>
+                <select 
+                  className="input-field"
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value)}
+                  style={{ width: '100%', background: 'rgba(30, 41, 59, 0.7)' }}
+                >
+                  <option value="EMPLOYEE">Employee (Read Only)</option>
+                  <option value="LEGAL_REVIEWER">Legal Reviewer (Read & Edit)</option>
+                  <option value="ADMIN">Tenant Administrator (Full Control)</option>
+                </select>
+              </div>
+
+              <button type="submit" className="btn" style={{ width: '100%', padding: '12px' }}>
+                Send Workspace Invitation
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Main Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-header">
@@ -787,8 +981,15 @@ function App() {
         {/* Tab 1: Dashboard Analytics */}
         {(currentPath === '/' || currentPath === '/dashboard') && (
           <div>
-            <h1 className="main-title">Workspace Analytics</h1>
-            <p className="sub-title">Corporate contract management, compliance thresholds, and legal audit indexes.</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <h1 className="main-title" style={{ margin: 0 }}>Workspace Analytics</h1>
+                <p className="sub-title" style={{ margin: 0, marginTop: 4 }}>Corporate contract management, compliance thresholds, and legal audit indexes.</p>
+              </div>
+              <button className="btn" onClick={() => setShowInviteModal(true)}>
+                ➕ Invite Team Members
+              </button>
+            </div>
 
             <div className="metrics-grid">
               <div className="metric-card">
