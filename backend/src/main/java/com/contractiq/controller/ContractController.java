@@ -250,12 +250,12 @@ public class ContractController {
         comment.setVendorFacing(request.isVendorFacing());
         comment.setCreatedAt(LocalDateTime.now());
 
-        // Append to the active version
-        int currentVersion = contractDoc.getCurrentVersion();
+        // Append to the specific or active version
+        int targetVersion = (request.getVersion() != null) ? request.getVersion() : contractDoc.getCurrentVersion();
         ContractVersion activeVersion = null;
         if (contractDoc.getVersionHistory() != null) {
             for (ContractVersion version : contractDoc.getVersionHistory()) {
-                if (version.getVersionNumber() == currentVersion) {
+                if (version.getVersionNumber() == targetVersion) {
                     activeVersion = version;
                     break;
                 }
@@ -264,7 +264,7 @@ public class ContractController {
 
         if (activeVersion == null) {
             activeVersion = new ContractVersion();
-            activeVersion.setVersionNumber(currentVersion);
+            activeVersion.setVersionNumber(targetVersion);
             activeVersion.setComments(new ArrayList<>());
             activeVersion.setUpdatedAt(LocalDateTime.now());
             if (contractDoc.getVersionHistory() == null) {
@@ -279,7 +279,7 @@ public class ContractController {
         activeVersion.getComments().add(comment);
         contractDocumentRepository.save(contractDoc);
 
-        log.info("Successfully added comment to contract {} version {}", id, currentVersion);
+        log.info("Successfully added comment to contract {} version {}", id, targetVersion);
         return ResponseEntity.ok(comment);
     }
 
@@ -461,6 +461,38 @@ public class ContractController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/{id}/download")
+    public ResponseEntity<org.springframework.core.io.Resource> downloadContractFile(@PathVariable("id") String id) {
+        log.info("Request to download contract file for ID: {}", id);
+        String tenantId = TenantContext.getTenantId();
+        if (tenantId == null || tenantId.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing tenant context");
+        }
+
+        ContractDocument contractDoc = contractDocumentRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found"));
+
+        if (!tenantId.equals(contractDoc.getTenantId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
+        }
+
+        try {
+            Path filePath = Paths.get(contractDoc.getStoredFilePath());
+            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+            if (resource.exists() || resource.isReadable()) {
+                return ResponseEntity.ok()
+                        .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + contractDoc.getOriginalFilename() + "\"")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                        .body(resource);
+            } else {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "File not found or not readable");
+            }
+        } catch (Exception e) {
+            log.error("Error reading contract file", e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error downloading file");
+        }
+    }
+
     private void validateMultipartFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File is empty or missing");
@@ -490,5 +522,6 @@ public class ContractController {
     public static class CommentRequest {
         private String content;
         private boolean isVendorFacing;
+        private Integer version;
     }
 }

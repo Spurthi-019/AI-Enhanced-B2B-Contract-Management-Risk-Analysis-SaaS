@@ -89,15 +89,59 @@ function App() {
   const [vendorPortalToken, setVendorPortalToken] = useState<string | null>(null);
   const [vendorPortalData, setVendorPortalData] = useState<any | null>(null);
 
+  // Path routing states
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [selectedVersion, setSelectedVersion] = useState<number>(1);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showCommentsSidebar, setShowCommentsSidebar] = useState(true);
+  const [showShareModal, setShowShareModal] = useState(false);
+
   useEffect(() => {
-    // Check if token exists in query string for Vendor Magic Link Portal
-    const params = new URLSearchParams(window.location.search);
-    const portalToken = params.get('token');
-    if (portalToken) {
-      setVendorPortalToken(portalToken);
-      loadVendorPortalData(portalToken);
-    }
+    const handleLocationChange = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handleLocationChange);
+    return () => window.removeEventListener('popstate', handleLocationChange);
   }, []);
+
+  const navigate = (to: string) => {
+    window.history.pushState(null, '', to);
+    setCurrentPath(to);
+  };
+
+  const contractIdFromPath = currentPath.startsWith('/contracts/') 
+    ? currentPath.substring('/contracts/'.length)
+    : null;
+
+  useEffect(() => {
+    if (contractIdFromPath && contracts.length > 0) {
+      const match = contracts.find(c => c.id === contractIdFromPath);
+      if (match) {
+        setSelectedContract(match);
+      }
+    } else if (!contractIdFromPath) {
+      setSelectedContract(null);
+    }
+  }, [contractIdFromPath, contracts]);
+
+  useEffect(() => {
+    if (selectedContract) {
+      setSelectedVersion(selectedContract.currentVersion);
+    }
+  }, [selectedContract]);
+
+  useEffect(() => {
+    if (currentPath.startsWith('/vendor/review')) {
+      const params = new URLSearchParams(window.location.search);
+      const portalToken = params.get('token');
+      if (portalToken) {
+        setVendorPortalToken(portalToken);
+        loadVendorPortalData(portalToken);
+      }
+    } else {
+      setVendorPortalToken(null);
+    }
+  }, [currentPath]);
 
   useEffect(() => {
     if (token) {
@@ -133,6 +177,7 @@ function App() {
         setToken(data.token);
         showToast('Successfully authenticated with developer credentials!');
         addActivity('Administrator authenticated successfully.');
+        navigate('/dashboard');
       } else {
         showToast('Authentication failed. Check your password.');
       }
@@ -148,6 +193,7 @@ function App() {
     setSelectedContract(null);
     showToast('Logged out of ContractIQ session.');
     addActivity('User logged out of active workspace.');
+    navigate('/');
   };
 
   const loadContracts = async (authToken: string) => {
@@ -223,6 +269,40 @@ function App() {
     }
   };
 
+  // Trigger RAG risk analysis for Contract Analysis Studio with spinner states
+  const triggerStudioAnalysis = async (contractId: string) => {
+    setIsAnalyzing(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/contracts/${contractId}/analyze`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        showToast('Legal risk analysis report generated successfully!');
+        addActivity(`Generated legal risk report for contract ID: ${contractId}.`);
+        
+        // Reload contracts list to pull new analysis
+        const loadRes = await fetch(`${BACKEND_URL}/api/v1/contracts`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (loadRes.ok) {
+          const list = await loadRes.json();
+          setContracts(list);
+          const updated = list.find((c: any) => c.id === contractId);
+          if (updated) {
+            setSelectedContract(updated);
+          }
+        }
+      } else {
+        showToast('Error during RAG risk evaluation');
+      }
+    } catch (err) {
+      showToast('Error during RAG risk evaluation');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   // Upload revised version
   const handleVersionUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -265,12 +345,12 @@ function App() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ content: commentContent, isVendorFacing })
+        body: JSON.stringify({ content: commentContent, isVendorFacing, version: selectedVersion })
       });
       if (res.ok) {
         const comment = await res.json();
         const updated = { ...selectedContract };
-        const activeVer = updated.versionHistory.find(v => v.versionNumber === updated.currentVersion);
+        const activeVer = updated.versionHistory.find(v => v.versionNumber === selectedVersion);
         if (activeVer) {
           if (!activeVer.comments) activeVer.comments = [];
           activeVer.comments.push(comment);
@@ -279,7 +359,7 @@ function App() {
         setContracts(prev => prev.map(c => c.id === updated.id ? updated : c));
         setCommentContent('');
         showToast('Comment posted successfully!');
-        addActivity(`Added note on "${selectedContract.title}" v${selectedContract.currentVersion}.`);
+        addActivity(`Added note on "${selectedContract.title}" v${selectedVersion}.`);
       }
     } catch (err) {
       showToast('Failed to post comment');
@@ -330,7 +410,7 @@ function App() {
         setShareEmail('');
       }
     } catch (err) {
-      showToast('Sharing invite generated successfully');
+      showToast('Failed to generate magic link sharing invitation');
     }
   };
 
@@ -378,88 +458,160 @@ function App() {
   // Render Vendor Magic Link portal standalone mode
   if (vendorPortalToken) {
     return (
-      <div className="dashboard-container" style={{ padding: 40 }}>
+      <div className="dashboard-container" style={{ padding: 40, background: '#0b0f19', minHeight: '100vh' }}>
         {toast && <div className="toast-msg">{toast}</div>}
-        <div className="glass-card" style={{ borderLeft: '6px solid #a78bfa' }}>
-          <h1 className="main-title">🔐 Vendor Secure Portal</h1>
-          <p className="sub-title">ContractIQ Secure Transmission Link Review Screen</p>
-          <a href="/" className="btn btn-secondary">← Exit Review Portal</a>
+        
+        {/* Simplified Header: NO navigation dropdowns or internal menus */}
+        <div className="glass-card" style={{ borderLeft: '6px solid #a78bfa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 }}>
+          <div>
+            <h1 className="main-title" style={{ fontSize: 24, margin: 0 }}>🔐 Vendor Secure Review Workspace</h1>
+            <p className="sub-title" style={{ margin: 0, marginTop: 5 }}>ContractIQ secure collaboration gateway</p>
+          </div>
+          <button className="btn btn-secondary" onClick={() => navigate('/')}>
+            ← Sign In
+          </button>
         </div>
 
         {vendorPortalData ? (
-          <div className="grid-2">
-            <div className="glass-card">
-              <h2 className="section-title">Contract Information</h2>
-              <div className="input-group">
-                <span className="input-label">Contract ID</span>
-                <div style={{ color: '#a78bfa', fontWeight: 'bold' }}>{vendorPortalData.id}</div>
-              </div>
-              <div className="input-group">
-                <span className="input-label">Title</span>
-                <div>{vendorPortalData.title}</div>
-              </div>
-              <div className="input-group">
-                <span className="input-label">Filename</span>
-                <div style={{ color: '#38bdf8' }}>📄 {vendorPortalData.originalFilename}</div>
-              </div>
-              <div className="input-group">
-                <span className="input-label">Current Version</span>
-                <div>Version {vendorPortalData.currentVersion}</div>
-              </div>
-            </div>
-
-            <div className="glass-card">
-              <h2 className="section-title">Comments Board</h2>
-              <div className="comments-list">
-                {vendorPortalData.comments && vendorPortalData.comments.length > 0 ? (
-                  vendorPortalData.comments.map((c: any) => (
-                    <div className="comment-bubble" key={c.id}>
-                      <div className="comment-header">
-                        <span className="comment-author">{c.authorEmail}</span>
-                        <span className="comment-date">{new Date(c.createdAt).toLocaleTimeString()}</span>
-                      </div>
-                      <div className="comment-body">{c.content}</div>
+          <div className="studio-container">
+            {/* Left Panel: Contract Metadata and PDF preview */}
+            <div className="studio-left-panel">
+              <div className="glass-card">
+                <div className="studio-meta-header">
+                  <div>
+                    <h2 className="studio-contract-title">{vendorPortalData.title}</h2>
+                    <div className="studio-meta-sub">
+                      <span>Shared File: <strong style={{ color: '#38bdf8' }}>{vendorPortalData.originalFilename}</strong></span>
+                      <span className="dot">•</span>
+                      <span>Version {vendorPortalData.currentVersion} Review</span>
                     </div>
-                  ))
-                ) : (
-                  <p style={{ color: '#64748b' }}>No comments shared with vendor for this version.</p>
-                )}
-              </div>
-            </div>
-
-            {vendorPortalData.analysis && (
-              <div className="glass-card" style={{ gridColumn: 'span 2' }}>
-                <h2 className="section-title">Legal Counsel AI Analysis</h2>
-                <div className="risk-meter-wrapper">
-                  <span className="input-label">Overall Risk:</span>
-                  <span className={`risk-level-indicator risk-level-${vendorPortalData.analysis.summary.overallRiskLevel}`}>
-                    {vendorPortalData.analysis.summary.overallRiskLevel}
-                  </span>
-                  <div className="risk-bar-bg">
-                    <div className={`risk-bar-fill fill-${vendorPortalData.analysis.summary.overallRiskLevel}`}></div>
                   </div>
                 </div>
-                <p style={{ margin: '15px 0', color: '#cbd5e1', fontSize: '14px', lineHeight: 1.6 }}>
-                  {vendorPortalData.analysis.summary.summaryText}
-                </p>
 
-                <h3 className="input-label" style={{ marginTop: 20, marginBottom: 10 }}>Identified Risk Clauses & Mitigations</h3>
-                {vendorPortalData.analysis.riskClauses && vendorPortalData.analysis.riskClauses.map((rc: any, idx: number) => (
-                  <div className="risk-clause-card" key={idx}>
-                    <div className="risk-clause-header">
-                      <span className="risk-clause-title">{rc.title}</span>
-                      <span className={`badge badge-${rc.riskLevel.toLowerCase()}`}>{rc.riskLevel}</span>
-                    </div>
-                    <div className="risk-clause-text">"{rc.clauseText}"</div>
-                    <div className="risk-clause-mitigation">💡 <strong>Mitigation:</strong> {rc.mitigation}</div>
-                  </div>
-                ))}
+                {/* PDF document viewer preview from secure portal endpoint */}
+                <div className="pdf-viewer-container" style={{ marginTop: 20 }}>
+                  <iframe 
+                    src={`${BACKEND_URL}/api/v1/vendor/portal/access/download?token=${vendorPortalToken}`}
+                    className="pdf-viewer-iframe"
+                    title="Vendor PDF Preview"
+                  />
+                </div>
               </div>
-            )}
+            </div>
+
+            {/* Right Panel: AI summary, clauses, and ONLY vendor comments thread */}
+            <div className="studio-right-panel">
+              {vendorPortalData.analysis ? (
+                <div className="glass-card">
+                  <h2 className="section-title">AI Legal Risk Summary</h2>
+                  
+                  {/* Overall Risk Score Gauge (0-100 color-coded) */}
+                  {(() => {
+                    const riskLevel = vendorPortalData.analysis.summary.overallRiskLevel || 'LOW';
+                    const riskScore = riskLevel === 'HIGH' ? 85 : riskLevel === 'MEDIUM' ? 50 : 15;
+                    const riskColor = riskLevel === 'HIGH' ? '#f87171' : riskLevel === 'MEDIUM' ? '#fbbf24' : '#34d399';
+                    return (
+                      <div className="risk-gauge-container">
+                        <div className="risk-gauge-visual">
+                          <svg width="120" height="120" viewBox="0 0 120 120">
+                            <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" />
+                            <circle 
+                              cx="60" 
+                              cy="60" 
+                              r="50" 
+                              fill="none" 
+                              stroke={riskColor} 
+                              strokeWidth="10" 
+                              strokeDasharray="314.16" 
+                              strokeDashoffset={314.16 - (314.16 * riskScore) / 100}
+                              strokeLinecap="round"
+                              transform="rotate(-90 60 60)"
+                              style={{ transition: 'stroke-dashoffset 0.8s ease-in-out' }}
+                            />
+                            <text x="60" y="65" textAnchor="middle" fill="#fff" fontSize="22" fontWeight="bold">
+                              {riskScore}
+                            </text>
+                          </svg>
+                          <div className="risk-gauge-label">
+                            <span className="risk-gauge-title">Risk Index</span>
+                            <span style={{ color: riskColor, fontWeight: 'bold', fontSize: 13 }}>{riskLevel} RISK</span>
+                          </div>
+                        </div>
+                        
+                        <div className="risk-gauge-summary">
+                          <h3 className="input-label" style={{ fontSize: 13, marginBottom: 6 }}>Executive Summary</h3>
+                          <p style={{ fontSize: 13, color: '#cbd5e1', margin: 0, lineHeight: 1.5 }}>
+                            {vendorPortalData.analysis.summary.summaryText}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Expandable High-Risk Clauses Accordion */}
+                  <div style={{ marginTop: 25 }}>
+                    <h3 className="input-label" style={{ fontSize: 14, marginBottom: 12 }}>Shared Clauses & Mitigations</h3>
+                    <div className="accordion-list">
+                      {vendorPortalData.analysis.riskClauses && vendorPortalData.analysis.riskClauses.map((rc: any, idx: number) => (
+                        <details key={idx} className="accordion-item">
+                          <summary className="accordion-header">
+                            <span className="accordion-title">{rc.title}</span>
+                            <span className={`badge badge-${rc.riskLevel.toLowerCase()}`} style={{ marginLeft: 'auto', marginRight: 10 }}>{rc.riskLevel}</span>
+                          </summary>
+                          <div className="accordion-content">
+                            <p className="clause-text">"{rc.clauseText}"</p>
+                            <div className="clause-mitigation">
+                              💡 <strong>Mitigation:</strong> {rc.mitigation}
+                            </div>
+                          </div>
+                        </details>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="glass-card" style={{ padding: 30, textAlign: 'center' }}>
+                  <p style={{ color: '#64748b' }}>AI Legal Analysis is not yet completed for this version.</p>
+                </div>
+              )}
+
+              {/* Vendor-Facing Comments Thread (ONLY public comments are returned here!) */}
+              <div className="glass-card">
+                <h2 className="section-title">Collaboration Notes (v{vendorPortalData.currentVersion})</h2>
+                <div className="comments-list" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {vendorPortalData.comments && vendorPortalData.comments.length > 0 ? (
+                    vendorPortalData.comments.map((c: any) => (
+                      <div 
+                        className="comment-bubble public-comment" 
+                        key={c.id}
+                        style={{ padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
+                      >
+                        <div className="comment-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <span className="comment-author" style={{ fontWeight: '600', fontSize: 12, color: '#e2e8f0' }}>
+                            {c.authorEmail.split('@')[0]}
+                          </span>
+                          <span className="comment-date" style={{ fontSize: 10, color: '#64748b' }}>
+                            {new Date(c.createdAt).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        <div className="comment-body" style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.4, wordBreak: 'break-word' }}>
+                          {c.content}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p style={{ color: '#64748b', textAlign: 'center', padding: '20px 0', fontSize: 13 }}>
+                      No shared comments recorded on this version.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
-          <div className="glass-card" style={{ textAlign: 'center', padding: '40px' }}>
-            <p>Loading portal reviews...</p>
+          <div className="glass-card" style={{ textAlign: 'center', padding: '60px' }}>
+            <span className="spinner" style={{ width: 24, height: 24, borderWidth: 3 }}></span>
+            <p style={{ marginTop: 15, color: '#94a3b8' }}>Establishing secure connection to transmission gateway...</p>
           </div>
         )}
       </div>
@@ -508,12 +660,78 @@ function App() {
   }
 
   const activeVersionObj = selectedContract?.versionHistory.find(
-    v => v.versionNumber === selectedContract.currentVersion
+    v => v.versionNumber === selectedVersion
   );
 
   return (
     <div className="app-layout">
       {toast && <div className="toast-msg">{toast}</div>}
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <div className="modal-backdrop">
+          <div className="modal-content glass-card" style={{ maxWidth: '500px', width: '90%' }}>
+            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 15, marginBottom: 20 }}>
+              <h2 className="section-title" style={{ margin: 0 }}>✉️ Share with Vendor</h2>
+              <button 
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18 }}
+                onClick={() => { setShowShareModal(false); setGeneratedMagicLink(''); }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <p style={{ color: '#94a3b8', fontSize: 13, lineHeight: 1.5, marginBottom: 20 }}>
+              Generate a cryptographically secure magic portal link to share version reviews with external vendor contacts. The contact will receive an email and can view public comments and AI risk summaries without requiring user account credentials.
+            </p>
+
+            <form onSubmit={handleShare}>
+              <div className="input-group" style={{ marginBottom: 15 }}>
+                <label className="input-label">Vendor Contact Email</label>
+                <input 
+                  type="email" 
+                  className="input-field" 
+                  placeholder="contact@vendorcompany.com" 
+                  value={shareEmail}
+                  onChange={(e) => setShareEmail(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  required
+                />
+              </div>
+              <button type="submit" className="btn" style={{ width: '100%' }}>
+                Send Magic Link & Grant Access
+              </button>
+            </form>
+
+            {generatedMagicLink && (
+              <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <span className="input-label" style={{ display: 'block', marginBottom: 8 }}>Secure Collaboration Magic Link:</span>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
+                  <input 
+                    type="text" 
+                    className="input-field" 
+                    value={generatedMagicLink} 
+                    readOnly 
+                    style={{ flexGrow: 1, fontSize: 12, background: 'rgba(0,0,0,0.2)', color: '#818cf8' }}
+                  />
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedMagicLink);
+                      showToast('Magic Link copied to clipboard!');
+                    }}
+                  >
+                    Copy
+                  </button>
+                </div>
+                <small style={{ display: 'block', marginTop: 8, color: '#64748b', fontSize: 11 }}>
+                  💡 Copy and open this link in an incognito window to verify the unauthenticated review workspace.
+                </small>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Sidebar */}
       <aside className="sidebar">
@@ -525,26 +743,26 @@ function App() {
 
           <nav className="sidebar-nav">
             <button 
-              className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-              onClick={() => { setActiveTab('dashboard'); setSelectedContract(null); }}
+              className={`nav-item ${currentPath === '/' || currentPath === '/dashboard' ? 'active' : ''}`}
+              onClick={() => navigate('/dashboard')}
             >
               📊 Dashboard
             </button>
             <button 
-              className={`nav-item ${activeTab === 'contracts' ? 'active' : ''}`}
-              onClick={() => setActiveTab('contracts')}
+              className={`nav-item ${currentPath.startsWith('/contracts') ? 'active' : ''}`}
+              onClick={() => navigate('/contracts')}
             >
               📁 Contracts Collection
             </button>
             <button 
-              className={`nav-item ${activeTab === 'upload' ? 'active' : ''}`}
-              onClick={() => setActiveTab('upload')}
+              className={`nav-item ${currentPath === '/upload' ? 'active' : ''}`}
+              onClick={() => navigate('/upload')}
             >
               📤 Upload Center
             </button>
             <button 
-              className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-              onClick={() => setActiveTab('settings')}
+              className={`nav-item ${currentPath === '/settings' ? 'active' : ''}`}
+              onClick={() => navigate('/settings')}
             >
               ⚙️ Settings
             </button>
@@ -566,7 +784,8 @@ function App() {
       <main className="main-content">
         
         {/* Tab 1: Dashboard Analytics */}
-        {activeTab === 'dashboard' && (
+        {/* Tab 1: Dashboard Analytics */}
+        {(currentPath === '/' || currentPath === '/dashboard') && (
           <div>
             <h1 className="main-title">Workspace Analytics</h1>
             <p className="sub-title">Corporate contract management, compliance thresholds, and legal audit indexes.</p>
@@ -608,154 +827,274 @@ function App() {
           </div>
         )}
 
-        {/* Tab 2: Contracts Collection (Search & Paginated list) */}
-        {activeTab === 'contracts' && (
+        {/* Tab 2: Contracts Collection (Search & Paginated list & Studio view) */}
+        {(currentPath === '/contracts' || currentPath.startsWith('/contracts/')) && (
           <div>
             <h1 className="main-title">Contracts Registry</h1>
             <p className="sub-title">Search, inspect, and evaluate B2B agreements within active tenant context.</p>
 
             {/* Split Screen if contract is selected for inspection */}
-            {selectedContract ? (
+            {selectedContract && currentPath.startsWith('/contracts/') ? (
               <div>
-                <button className="btn btn-secondary" style={{ marginBottom: 20 }} onClick={() => setSelectedContract(null)}>
-                  ← Back to collection table
-                </button>
-                <div className="grid-2">
-                  {/* Uploader control */}
-                  <div className="glass-card">
-                    <h2 className="section-title">Version Revision Control</h2>
-                    <p style={{ fontSize: 13, color: '#94a3b8', marginBottom: 15 }}>
-                      Contract Title: <strong style={{ color: '#fff' }}>{selectedContract.title}</strong><br/>
-                      Stored File: <strong style={{ color: '#38bdf8' }}>{selectedContract.originalFilename}</strong>
-                    </p>
-                    <form onSubmit={handleVersionUpload}>
-                      <div className="input-group">
-                        <label className="input-label">Upload Revised Document (PDF)</label>
-                        <input 
-                          type="file" 
-                          className="input-file" 
-                          accept="application/pdf"
-                          onChange={(e) => setNewVersionFile(e.target.files ? e.target.files[0] : null)}
-                          required
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                  <button className="btn btn-secondary" onClick={() => navigate('/contracts')}>
+                    ← Back to collection table
+                  </button>
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={() => setShowCommentsSidebar(!showCommentsSidebar)}
+                  >
+                    💬 {showCommentsSidebar ? 'Hide Sidebar' : 'Show Comments & Notes'}
+                  </button>
+                </div>
+                
+                <div className="studio-container" style={{ display: 'grid', gridTemplateColumns: showCommentsSidebar ? '1fr 0.9fr 350px' : '1.1fr 0.9fr', gap: 24, alignItems: 'start' }}>
+                  {/* Left Panel: PDF and metadata */}
+                  <div className="studio-left-panel">
+                    <div className="glass-card">
+                      <div className="studio-meta-header">
+                        <div>
+                          <h2 className="studio-contract-title">{selectedContract.title}</h2>
+                          <div className="studio-meta-sub">
+                            <span>Uploaded: {new Date(selectedContract.createdAt).toLocaleDateString()}</span>
+                            <span className="dot">•</span>
+                            <span>Tenant: <code style={{ color: '#a78bfa' }}>{selectedContract.tenantId.substring(0, 8)}...</code></span>
+                          </div>
+                          <div style={{ marginTop: 10 }}>
+                            <button 
+                              className="btn btn-secondary" 
+                              style={{ padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                              onClick={() => setShowShareModal(true)}
+                            >
+                              ✉️ Share with Vendor
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {/* Version selector dropdown */}
+                        <div className="version-selector-group">
+                          <label className="input-label" style={{ marginBottom: 4 }}>Active Review Version</label>
+                          <select 
+                            className="input-field" 
+                            style={{ padding: '8px 12px', fontSize: 13, background: 'rgba(30, 41, 59, 0.7)' }}
+                            value={selectedVersion}
+                            onChange={(e) => setSelectedVersion(Number(e.target.value))}
+                          >
+                            {selectedContract.versionHistory.map(v => (
+                              <option key={v.versionNumber} value={v.versionNumber}>
+                                Version {v.versionNumber}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* PDF document viewer preview */}
+                      <div className="pdf-viewer-container" style={{ marginTop: 20 }}>
+                        <iframe 
+                          src={`${BACKEND_URL}/api/v1/contracts/${selectedContract.id}/download?token=${token}`}
+                          className="pdf-viewer-iframe"
+                          title="PDF Preview"
                         />
                       </div>
-                      <button type="submit" className="btn" style={{ width: '100%' }}>
-                        Submit Version {selectedContract.currentVersion + 1}
-                      </button>
-                    </form>
-
-                    <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                      <button 
-                        className="btn btn-danger" 
-                        style={{ width: '100%', padding: '10px' }} 
-                        onClick={() => handleDeleteContract(selectedContract.id)}
-                      >
-                        🗑️ Delete Entire Contract
-                      </button>
                     </div>
+                  </div>
 
-                    {/* Share wizard */}
-                    <div style={{ marginTop: 25, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                      <h3 className="input-label" style={{ marginBottom: 10, fontSize: 14 }}>Send Magic Portal Link</h3>
-                      <form onSubmit={handleShare} style={{ display: 'flex', gap: 10 }}>
-                        <input 
-                          type="email" 
+                  {/* Right Panel: AI Executive Summary & Risk Analysis */}
+                  <div className="studio-right-panel">
+                    {/* Render analysis if present */}
+                    {activeVersionObj?.analysis ? (
+                      <div className="glass-card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                          <h2 className="section-title" style={{ margin: 0 }}>AI Risk Analysis</h2>
+                          
+                          {/* Analyze Contract Button inside studio */}
+                          <button 
+                            className="btn btn-secondary" 
+                            style={{ padding: '8px 16px', fontSize: '13px' }} 
+                            onClick={() => triggerStudioAnalysis(selectedContract.id)}
+                            disabled={isAnalyzing}
+                          >
+                            {isAnalyzing ? (
+                              <>
+                                <span className="spinner"></span> Analyzing...
+                              </>
+                            ) : (
+                              '🔄 Re-Run AI Analysis'
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Overall Risk Score Gauge (0-100 color-coded) */}
+                        {(() => {
+                          const riskLevel = activeVersionObj.analysis.summary.overallRiskLevel || 'LOW';
+                          const riskScore = riskLevel === 'HIGH' ? 85 : riskLevel === 'MEDIUM' ? 50 : 15;
+                          const riskColor = riskLevel === 'HIGH' ? '#f87171' : riskLevel === 'MEDIUM' ? '#fbbf24' : '#34d399';
+                          return (
+                            <div className="risk-gauge-container">
+                              <div className="risk-gauge-visual">
+                                <svg width="120" height="120" viewBox="0 0 120 120">
+                                  <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" />
+                                  <circle 
+                                    cx="60" 
+                                    cy="60" 
+                                    r="50" 
+                                    fill="none" 
+                                    stroke={riskColor} 
+                                    strokeWidth="10" 
+                                    strokeDasharray="314.16" 
+                                    strokeDashoffset={314.16 - (314.16 * riskScore) / 100}
+                                    strokeLinecap="round"
+                                    transform="rotate(-90 60 60)"
+                                    style={{ transition: 'stroke-dashoffset 0.8s ease-in-out' }}
+                                  />
+                                  <text x="60" y="65" textAnchor="middle" fill="#fff" fontSize="22" fontWeight="bold">
+                                    {riskScore}
+                                  </text>
+                                </svg>
+                                <div className="risk-gauge-label">
+                                  <span className="risk-gauge-title">Risk Index</span>
+                                  <span style={{ color: riskColor, fontWeight: 'bold', fontSize: 13 }}>{riskLevel} RISK</span>
+                                </div>
+                              </div>
+                              
+                              <div className="risk-gauge-summary">
+                                <h3 className="input-label" style={{ fontSize: 13, marginBottom: 6 }}>Executive Summary</h3>
+                                <p style={{ fontSize: 13, color: '#cbd5e1', margin: 0, lineHeight: 1.5 }}>
+                                  {activeVersionObj.analysis.summary.summaryText}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Expandable High-Risk Clauses Accordion */}
+                        <div style={{ marginTop: 25 }}>
+                          <h3 className="input-label" style={{ fontSize: 14, marginBottom: 12 }}>Identified Clauses & suggested mitigations</h3>
+                          <div className="accordion-list">
+                            {activeVersionObj.analysis.riskClauses.map((rc, idx) => (
+                              <details key={idx} className="accordion-item">
+                                <summary className="accordion-header">
+                                  <span className="accordion-title">{rc.title}</span>
+                                  <span className={`badge badge-${rc.riskLevel.toLowerCase()}`} style={{ marginLeft: 'auto', marginRight: 10 }}>{rc.riskLevel}</span>
+                                </summary>
+                                <div className="accordion-content">
+                                  <p className="clause-text">"{rc.clauseText}"</p>
+                                  <div className="clause-mitigation">
+                                    💡 <strong>Mitigation:</strong> {rc.mitigation}
+                                  </div>
+                                </div>
+                              </details>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="glass-card" style={{ textAlign: 'center', padding: '60px 20px' }}>
+                        <div style={{ fontSize: '48px', marginBottom: 20 }}>📊</div>
+                        <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#fff', marginBottom: 10 }}>AI Legal Report Pending</h3>
+                        <p style={{ color: '#94a3b8', fontSize: '14px', maxWidth: '360px', margin: '0 auto 24px', lineHeight: 1.5 }}>
+                          No AI evaluation has been executed for this contract version yet.
+                        </p>
+                        
+                        <button 
+                          className="btn" 
+                          style={{ padding: '12px 24px' }}
+                          onClick={() => triggerStudioAnalysis(selectedContract.id)}
+                          disabled={isAnalyzing}
+                        >
+                          {isAnalyzing ? (
+                            <>
+                              <span className="spinner"></span> Generating AI Review...
+                            </>
+                          ) : (
+                            'Analyze Contract'
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Comments Sidebar Drawer */}
+                  {showCommentsSidebar && (
+                    <div className="studio-comments-sidebar glass-card">
+                      <div className="sidebar-comments-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 12, marginBottom: 15 }}>
+                        <h2 className="section-title" style={{ margin: 0, fontSize: 16 }}>
+                          Version {selectedVersion} Notes
+                        </h2>
+                        <button 
+                          style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 16 }}
+                          onClick={() => setShowCommentsSidebar(false)}
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      {/* Comments List */}
+                      <div className="sidebar-comments-list" style={{ overflowY: 'auto', maxHeight: '420px', marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 12, paddingRight: 5 }}>
+                        {activeVersionObj?.comments && activeVersionObj.comments.length > 0 ? (
+                          activeVersionObj.comments.map(c => (
+                            <div 
+                              className={`comment-bubble ${c.vendorFacing ? 'public-comment' : 'private-comment'}`} 
+                              key={c.id}
+                              style={{ padding: 12, borderRadius: 8, background: c.vendorFacing ? 'rgba(255,255,255,0.02)' : 'rgba(245, 158, 11, 0.03)', border: c.vendorFacing ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(245, 158, 11, 0.12)' }}
+                            >
+                              <div className="comment-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                <span className="comment-author" style={{ fontWeight: '600', fontSize: 12, color: '#e2e8f0' }}>
+                                  {c.authorEmail.split('@')[0]}
+                                </span>
+                                <span className="comment-date" style={{ fontSize: 10, color: '#64748b' }}>
+                                  {new Date(c.createdAt).toLocaleTimeString()}
+                                </span>
+                              </div>
+                              <div className="comment-body" style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.4, wordBreak: 'break-word' }}>
+                                {c.content}
+                              </div>
+                              <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-start' }}>
+                                {c.vendorFacing ? (
+                                  <span className="badge badge-vendor" style={{ fontSize: 10, padding: '2px 6px' }}>
+                                    🌍 Vendor Facing
+                                  </span>
+                                ) : (
+                                  <span className="badge badge-private" style={{ fontSize: 10, padding: '2px 6px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                                    🔒 Private Note
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p style={{ color: '#64748b', textAlign: 'center', padding: '30px 0', fontSize: 13 }}>
+                            No comments recorded on version {selectedVersion}.
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Post Comment Form */}
+                      <form onSubmit={handlePostComment} style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 15 }}>
+                        <textarea 
                           className="input-field" 
-                          placeholder="vendor@b2bproject.com"
-                          value={shareEmail}
-                          onChange={(e) => setShareEmail(e.target.value)}
-                          style={{ flexGrow: 1 }}
+                          placeholder={`Add a note to version ${selectedVersion}...`}
+                          value={commentContent}
+                          onChange={(e) => setCommentContent(e.target.value)}
+                          style={{ width: '100%', boxSizing: 'border-box', height: 80, padding: 10, fontSize: 13, marginBottom: 12, resize: 'none' }}
                           required
                         />
-                        <button type="submit" className="btn">Share</button>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#cbd5e1', cursor: 'pointer' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={isVendorFacing} 
+                              onChange={(e) => setIsVendorFacing(e.target.checked)} 
+                            />
+                            Share with Vendor Portal (Public)
+                          </label>
+                          <button type="submit" className="btn btn-secondary" style={{ width: '100%', padding: '10px' }}>
+                            Post Comment
+                          </button>
+                        </div>
                       </form>
-                      {generatedMagicLink && (
-                        <div style={{ marginTop: 15, background: 'rgba(99,102,241,0.1)', padding: 12, borderRadius: 8, border: '1px dashed #6366f1' }}>
-                          <span className="input-label" style={{ display: 'block', marginBottom: 5 }}>Secure Link (Right click to open in incognito):</span>
-                          <a href={generatedMagicLink} style={{ color: '#818cf8', wordBreak: 'break-all', fontSize: 12 }}>
-                            {generatedMagicLink}
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Comments board */}
-                  <div className="glass-card">
-                    <h2 className="section-title">Collaboration Notes (v{selectedContract.currentVersion})</h2>
-                    <div className="comments-list">
-                      {activeVersionObj?.comments && activeVersionObj.comments.length > 0 ? (
-                        activeVersionObj.comments.map(c => (
-                          <div className="comment-bubble" key={c.id}>
-                            <div className="comment-header">
-                              <span className="comment-author">
-                                {c.authorEmail}
-                                {c.vendorFacing && <span className="comment-badge-vendor">Vendor Facing</span>}
-                              </span>
-                              <span className="comment-date">{new Date(c.createdAt).toLocaleTimeString()}</span>
-                            </div>
-                            <div className="comment-body">{c.content}</div>
-                          </div>
-                        ))
-                      ) : (
-                        <p style={{ color: '#64748b', textAlign: 'center', padding: '30px 0' }}>No comments recorded on this version.</p>
-                      )}
-                    </div>
-
-                    <form onSubmit={handlePostComment}>
-                      <input 
-                        type="text" 
-                        className="input-field" 
-                        placeholder="Type notes here..." 
-                        value={commentContent}
-                        onChange={(e) => setCommentContent(e.target.value)}
-                        style={{ width: '100%', boxSizing: 'border-box', marginBottom: 10 }}
-                        required
-                      />
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-                          <input 
-                            type="checkbox" 
-                            checked={isVendorFacing} 
-                            onChange={(e) => setIsVendorFacing(e.target.checked)} 
-                          />
-                          Share with Vendor Portal
-                        </label>
-                        <button type="submit" className="btn btn-secondary">Post Note</button>
-                      </div>
-                    </form>
-                  </div>
-
-                  {/* AI report board */}
-                  {activeVersionObj?.analysis && (
-                    <div className="glass-card" style={{ gridColumn: 'span 2' }}>
-                      <h2 className="section-title">Legal AI RAG Analysis</h2>
-                      <div className="risk-meter-wrapper">
-                        <span className="input-label">Risk Threshold:</span>
-                        <span className={`risk-level-indicator risk-level-${activeVersionObj.analysis.summary.overallRiskLevel}`}>
-                          {activeVersionObj.analysis.summary.overallRiskLevel}
-                        </span>
-                        <div className="risk-bar-bg">
-                          <div className={`risk-bar-fill fill-${activeVersionObj.analysis.summary.overallRiskLevel}`}></div>
-                        </div>
-                      </div>
-                      <p style={{ margin: '15px 0', color: '#cbd5e1', fontSize: '14px', lineHeight: 1.6 }}>
-                        {activeVersionObj.analysis.summary.summaryText}
-                      </p>
-
-                      <h3 className="input-label" style={{ marginTop: 20, marginBottom: 12, fontSize: 14 }}>Identified Clauses & legal mitigations</h3>
-                      <div className="grid-2">
-                        {activeVersionObj.analysis.riskClauses.map((rc, idx) => (
-                          <div className="risk-clause-card" key={idx}>
-                            <div className="risk-clause-header">
-                              <span className="risk-clause-title">{rc.title}</span>
-                              <span className={`badge badge-${rc.riskLevel.toLowerCase()}`}>{rc.riskLevel}</span>
-                            </div>
-                            <div className="risk-clause-text">"{rc.clauseText}"</div>
-                            <div className="risk-clause-mitigation">💡 <strong>Mitigation:</strong> {rc.mitigation}</div>
-                          </div>
-                        ))}
-                      </div>
                     </div>
                   )}
                 </div>
@@ -771,7 +1110,7 @@ function App() {
                     value={searchQuery}
                     onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                   />
-                  <button className="btn" onClick={() => setActiveTab('upload')}>
+                  <button className="btn" onClick={() => navigate('/upload')}>
                     + Upload Contract
                   </button>
                 </div>
@@ -808,7 +1147,7 @@ function App() {
                               </td>
                               <td>
                                 <div style={{ display: 'flex', gap: '8px' }}>
-                                  <button className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={() => setSelectedContract(doc)}>
+                                  <button className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={() => navigate(`/contracts/${doc.id}`)}>
                                     Inspect Details
                                   </button>
                                   <button className="btn btn-danger" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={() => handleDeleteContract(doc.id)}>
@@ -854,7 +1193,7 @@ function App() {
         )}
 
         {/* Tab 3: Upload Center */}
-        {activeTab === 'upload' && (
+        {currentPath === '/upload' && (
           <div className="glass-card" style={{ maxWidth: '600px', margin: '0 auto' }}>
             <h1 className="main-title">Upload Center</h1>
             <p className="sub-title">Submit a PDF agreement to register metadata and generate vector embeddings.</p>
@@ -889,7 +1228,7 @@ function App() {
         )}
 
         {/* Tab 4: System Settings */}
-        {activeTab === 'settings' && (
+        {currentPath === '/settings' && (
           <div className="glass-card" style={{ maxWidth: '600px', margin: '0 auto' }}>
             <h1 className="main-title">Tenant Settings</h1>
             <p className="sub-title">System keys, environment configs, and legal AI model options.</p>
@@ -904,7 +1243,7 @@ function App() {
             </div>
             <div className="input-group">
               <span className="input-label">Vector Database</span>
-              <div>PostgreSQL 16 with PGVector Store Starter</div>
+              <div>PostgreSQL 18 (Native Host Service)</div>
             </div>
             <div className="input-group">
               <span className="input-label">Audit Log Level</span>

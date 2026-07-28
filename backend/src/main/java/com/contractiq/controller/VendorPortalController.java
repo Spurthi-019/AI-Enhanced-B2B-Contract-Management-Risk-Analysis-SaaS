@@ -97,4 +97,43 @@ public class VendorPortalController {
         log.info("Granted vendor review access for contract: {} version: {}", contractId, currentVersionNumber);
         return response;
     }
+
+    @GetMapping("/access/download")
+    public org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> downloadVendorContractFile(@RequestParam("token") String token) {
+        log.info("Vendor portal request to download contract file with token");
+        Claims claims;
+        try {
+            claims = vendorTokenService.parseVendorToken(token);
+        } catch (Exception e) {
+            log.warn("Invalid vendor token verification failure: {}", e.getMessage());
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired review token");
+        }
+
+        String contractId = claims.get("contractId", String.class);
+        String tenantId = claims.get("tenantId", String.class);
+
+        ContractDocument contractDoc = contractDocumentRepository.findById(contractId)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found"));
+
+        if (!tenantId.equals(contractDoc.getTenantId())) {
+            log.error("Tenant mismatch in vendor portal token: {} vs contract: {}", tenantId, contractDoc.getTenantId());
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied to this contract resource");
+        }
+
+        try {
+            java.nio.file.Path filePath = java.nio.file.Paths.get(contractDoc.getStoredFilePath());
+            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+            if (resource.exists() || resource.isReadable()) {
+                return org.springframework.http.ResponseEntity.ok()
+                        .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + contractDoc.getOriginalFilename() + "\"")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                        .body(resource);
+            } else {
+                throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "File not found or not readable");
+            }
+        } catch (Exception e) {
+            log.error("Error reading contract file for vendor", e);
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error downloading file");
+        }
+    }
 }
