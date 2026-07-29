@@ -10,6 +10,8 @@ import com.contractiq.service.ContractAnalysisService;
 import com.contractiq.service.VectorIndexingService;
 import com.contractiq.service.VendorTokenService;
 import com.contractiq.service.EmailNotificationService;
+import com.contractiq.dto.ChatRequest;
+import com.contractiq.dto.ChatResponse;
 import io.jsonwebtoken.Claims;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -22,6 +24,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.document.Document;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -48,19 +55,25 @@ public class ContractController {
     private final ContractAnalysisService contractAnalysisService;
     private final VendorTokenService vendorTokenService;
     private final EmailNotificationService emailNotificationService;
+    private final ChatModel chatModel;
+    private final VectorStore vectorStore;
 
     public ContractController(
             ContractDocumentRepository contractDocumentRepository,
             VectorIndexingService vectorIndexingService,
             ContractAnalysisService contractAnalysisService,
             VendorTokenService vendorTokenService,
-            EmailNotificationService emailNotificationService
+            EmailNotificationService emailNotificationService,
+            ChatModel chatModel,
+            VectorStore vectorStore
     ) {
         this.contractDocumentRepository = contractDocumentRepository;
         this.vectorIndexingService = vectorIndexingService;
         this.contractAnalysisService = contractAnalysisService;
         this.vendorTokenService = vendorTokenService;
         this.emailNotificationService = emailNotificationService;
+        this.chatModel = chatModel;
+        this.vectorStore = vectorStore;
     }
 
     @GetMapping
@@ -186,6 +199,9 @@ public class ContractController {
 
         activeVersion.setAnalysis(analysis);
         activeVersion.setUpdatedAt(LocalDateTime.now());
+        if (analysis != null && analysis.getExpirationDate() != null) {
+            contractDoc.setExpirationDate(analysis.getExpirationDate());
+        }
         contractDocumentRepository.save(contractDoc);
 
         log.info("Successfully updated contract document {} inside MongoDB with analysis data", id);
@@ -414,6 +430,10 @@ public class ContractController {
         }
         contractDoc.getVersionHistory().add(versionEntry);
 
+        if (analysis != null && analysis.getExpirationDate() != null) {
+            contractDoc.setExpirationDate(analysis.getExpirationDate());
+        }
+
         ContractDocument savedDoc = contractDocumentRepository.save(contractDoc);
         log.info("Successfully uploaded, indexed, and analyzed new version {} for contract {}", nextVersion, id);
 
@@ -523,5 +543,83 @@ public class ContractController {
         private String content;
         private boolean isVendorFacing;
         private Integer version;
+    }
+
+    @PostMapping("/{id}/chat")
+    public ResponseEntity<ChatResponse> chatAboutContract(
+            @PathVariable("id") String id,
+            @RequestBody ChatRequest request
+    ) {
+        log.info("Received chat query for contract ID: {} query: {}", id, request.getQuestion());
+
+        String tenantId = TenantContext.getTenantId();
+        if (tenantId == null || tenantId.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing tenant context");
+        }
+
+        ContractDocument contractDoc = contractDocumentRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found"));
+
+        if (!tenantId.equals(contractDoc.getTenantId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
+        }
+
+        // 1. RAG context query setup: Search top 3 relevant chunks
+        List<Document> relevantDocs;
+        if (vectorStore instanceof org.springframework.ai.vectorstore.SimpleVectorStore) {
+            SearchRequest searchRequest = SearchRequest.query(request.getQuestion()).withTopK(100);
+            List<Document> allDocs = vectorStore.similaritySearch(searchRequest);
+            relevantDocs = allDocs.stream()
+                    .filter(doc -> {
+                        Object tId = doc.getMetadata().get("tenantId");
+                        Object cId = doc.getMetadata().get("contractId");
+                        Object ver = doc.getMetadata().get("version");
+                        return tenantId.equals(tId) && 
+                               id.equals(cId) && 
+                               (ver == null || Integer.valueOf(contractDoc.getCurrentVersion()).equals(Integer.valueOf(ver.toString())));
+                    })
+                    .limit(3)
+                    .collect(Collectors.toList());
+        } else {
+            String filterExpression = String.format("tenantId == '%s' && contractId == '%s' && version == %d", 
+                    tenantId, id, contractDoc.getCurrentVersion());
+            SearchRequest searchRequest = SearchRequest.query(request.getQuestion())
+                    .withTopK(3)
+                    .withFilterExpression(filterExpression);
+            relevantDocs = vectorStore.similaritySearch(searchRequest);
+        }
+
+        String contextText = relevantDocs.stream()
+                .map(Document::getContent)
+                .collect(Collectors.joining("\n---\n"));
+
+        // 2. Format Prompt and invoke LLM ChatModel
+        String promptText = String.format("""
+                You are a helpful corporate legal assistant for ContractIQ.
+                Answer the user's Question using ONLY the contract Context provided below.
+                Make the response professional, clear, and direct.
+                If the answer cannot be found or inferred from the context, state: "I'm sorry, but that information is not available in the active contract version."
+                
+                Context:
+                %s
+                
+                Question:
+                %s
+                
+                Answer:
+                """, contextText, request.getQuestion());
+
+        String answer;
+        try {
+            org.springframework.ai.chat.model.ChatResponse aiResponse = chatModel.call(new Prompt(promptText));
+            answer = aiResponse.getResult().getOutput().getContent();
+        } catch (Exception e) {
+            log.warn("Ollama AI connection failed. Using mock RAG response. Error: {}", e.getMessage());
+            answer = "ContractIQ AI Assistant (offline mode): Based on the review of the active contract version: '" + 
+                     contractDoc.getTitle() + "', the contract specifies standard provisions. Regarding your question: '" + 
+                     request.getQuestion() + "', please ensure the AI server is online to run similarity search.";
+        }
+
+        return ResponseEntity.ok(new ChatResponse(answer));
     }
 }

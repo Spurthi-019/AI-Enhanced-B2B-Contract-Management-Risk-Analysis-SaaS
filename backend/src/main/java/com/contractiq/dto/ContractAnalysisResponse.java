@@ -12,4 +12,6 @@ import java.util.List;
 public class ContractAnalysisResponse {
     private ContractSummary summary;
     private List<RiskClause> riskClauses;
+    private String expirationDate;
+    private List<String> keyTerms;
 }

@@ -27,6 +27,12 @@ public class MockAiConfig {
         return new ChatModel() {
             @Override
             public ChatResponse call(Prompt prompt) {
+                String promptText = prompt.getContents();
+                if (promptText.contains("legal assistant")) {
+                    String mockAnswer = "ContractIQ AI Assistant (mock RAG): Based on the review of the active contract version, the payment terms specify that all invoices are due Net 30 from receipt. Uncapped liability applies to data breaches under Section 5.";
+                    return new ChatResponse(List.of(new Generation(mockAnswer)));
+                }
+
                 // Mock a valid legal risk analysis JSON response matching our DTOs
                 String mockResponseJson = """
                 {
@@ -47,6 +53,12 @@ public class MockAiConfig {
                       "clauseText": "Section 9.1: Vendor shall indemnify and hold Customer harmless from any and all claims, losses, or liabilities arising from the services.",
                       "mitigation": "Limit indemnification to third-party claims arising from gross negligence or willful misconduct."
                     }
+                  ],
+                  "expirationDate": "Expires in 1 year on 2027-07-28",
+                  "keyTerms": [
+                    "Net 30 Payment Terms",
+                    "Uncapped Liability for Data Breaches under Section 5",
+                    "Customer intellectual property transfers upon payment"
                   ]
                 }
                 """;

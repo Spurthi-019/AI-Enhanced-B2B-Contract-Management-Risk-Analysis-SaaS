@@ -71,8 +71,10 @@ public class ContractAnalysisService {
         // 3. Define the legal prompting template
         String promptInstruction = """
                 You are an expert corporate legal counsel analyzing a business contract.
-                Evaluate the contract text provided in the Context below specifically checking for liabilities, indemnities, warranties, and termination clauses.
-                Identify any risk items and provide mitigations.
+                Evaluate the contract text provided in the Context below:
+                1. Identify any risk items and provide mitigations.
+                2. Extract the expiration date or duration of the contract (e.g., "Expires in 1 year on 2027-07-28" or "Indefinite / Permanent" if not specified).
+                3. Extract 3-5 core key terms or highlights from the contract.
                 
                 Context:
                 {context}
@@ -136,6 +138,12 @@ public class ContractAnalysisService {
         clauses.add(rc3);
         
         response.setRiskClauses(clauses);
+        response.setExpirationDate("Expires in 1 year on 2027-07-28");
+        response.setKeyTerms(java.util.List.of(
+            "Uncapped Indemnity for IP Infringement",
+            "30-day unilateral termination for convenience",
+            "Intellectual Property transfers to Client upon payment"
+        ));
         return response;
     }
 }
