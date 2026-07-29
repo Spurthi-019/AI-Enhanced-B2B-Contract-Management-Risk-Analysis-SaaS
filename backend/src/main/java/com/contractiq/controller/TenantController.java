@@ -108,4 +108,29 @@ public class TenantController {
         log.info("Successfully invited user {} to company {} as {}", newUser.getEmail(), tenant.getName(), rawRole);
         return ResponseEntity.ok(java.util.Map.of("message", "Invitation sent successfully to " + request.getEmail()));
     }
+
+    @GetMapping("/users")
+    public ResponseEntity<java.util.List<com.contractiq.dto.TenantUsersResponse>> getTenantUsers(Principal principal) {
+        log.info("Request to list workspace roster received from user: {}", principal.getName());
+        
+        UUID userId = UUID.fromString(principal.getName());
+        User currentUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+                
+        Tenant tenant = currentUser.getTenant();
+        if (tenant == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Current user is not mapped to any tenant workspace");
+        }
+        
+        java.util.List<User> workspaceUsers = userRepository.findByTenantId(tenant.getId());
+        java.util.List<com.contractiq.dto.TenantUsersResponse> response = workspaceUsers.stream()
+                .map(u -> new com.contractiq.dto.TenantUsersResponse(
+                        u.getId().toString(),
+                        u.getEmail(),
+                        u.getRoles().stream().map(Role::getName).collect(java.util.stream.Collectors.toList())
+                ))
+                .collect(java.util.stream.Collectors.toList());
+                
+        return ResponseEntity.ok(response);
+    }
 }
