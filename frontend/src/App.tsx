@@ -102,6 +102,12 @@ function App() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('EMPLOYEE');
 
+  // RAG Chat States
+  const [rightPanelTab, setRightPanelTab] = useState<'risk' | 'chat'>('risk');
+  const [chatMessages, setChatMessages] = useState<{[key: string]: { sender: 'user' | 'ai', text: string }[]}>({});
+  const [chatInput, setChatInput] = useState('');
+  const [isSendingChat, setIsSendingChat] = useState(false);
+
   useEffect(() => {
     const handleLocationChange = () => {
       setCurrentPath(window.location.pathname);
@@ -417,6 +423,68 @@ function App() {
       }
     } catch (err) {
       showToast('Failed to generate magic link sharing invitation');
+    }
+  };
+
+  // Send AI Chat Message (RAG System)
+  const handleSendChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || !selectedContract || isSendingChat) return;
+
+    const userMessage = chatInput.trim();
+    setChatInput('');
+    setIsSendingChat(true);
+
+    const contractId = selectedContract.id;
+    // 1. Instantly append User's message to local chat history for this contract
+    setChatMessages(prev => {
+      const currentList = prev[contractId] || [];
+      return {
+        ...prev,
+        [contractId]: [...currentList, { sender: 'user', text: userMessage }]
+      };
+    });
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/contracts/${contractId}/chat`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ question: userMessage })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setChatMessages(prev => {
+          const currentList = prev[contractId] || [];
+          return {
+            ...prev,
+            [contractId]: [...currentList, { sender: 'ai', text: data.answer }]
+          };
+        });
+      } else {
+        showToast('AI Chat request failed. Check server status.');
+        setChatMessages(prev => {
+          const currentList = prev[contractId] || [];
+          return {
+            ...prev,
+            [contractId]: [...currentList, { sender: 'ai', text: 'Error: Failed to fetch AI answer.' }]
+          };
+        });
+      }
+    } catch (err) {
+      showToast('Network error during AI chat request');
+      setChatMessages(prev => {
+        const currentList = prev[contractId] || [];
+        return {
+          ...prev,
+          [contractId]: [...currentList, { sender: 'ai', text: 'Network error communicating with ContractIQ AI.' }]
+        };
+      });
+    } finally {
+      setIsSendingChat(false);
     }
   };
 
@@ -1056,10 +1124,18 @@ function App() {
                       <div className="studio-meta-header">
                         <div>
                           <h2 className="studio-contract-title">{selectedContract.title}</h2>
-                          <div className="studio-meta-sub">
+                          <div className="studio-meta-sub" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                             <span>Uploaded: {new Date(selectedContract.createdAt).toLocaleDateString()}</span>
                             <span className="dot">•</span>
                             <span>Tenant: <code style={{ color: '#a78bfa' }}>{selectedContract.tenantId.substring(0, 8)}...</code></span>
+                            {selectedContract.expirationDate && (
+                              <>
+                                <span className="dot">•</span>
+                                <span className="badge" style={{ background: 'rgba(167, 139, 250, 0.1)', color: '#a78bfa', border: '1px solid rgba(167, 139, 250, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', fontSize: 12 }}>
+                                  📅 {selectedContract.expirationDate}
+                                </span>
+                              </>
+                            )}
                           </div>
                           <div style={{ marginTop: 10 }}>
                             <button 
@@ -1101,117 +1177,223 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Right Panel: AI Executive Summary & Risk Analysis */}
+                  {/* Right Panel: AI Executive Summary & Risk Analysis / Chat */}
                   <div className="studio-right-panel">
-                    {/* Render analysis if present */}
-                    {activeVersionObj?.analysis ? (
-                      <div className="glass-card">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                          <h2 className="section-title" style={{ margin: 0 }}>AI Risk Analysis</h2>
+                    {/* Tab Navigation for Right Panel */}
+                    <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                      <button 
+                        className={`btn ${rightPanelTab === 'risk' ? '' : 'btn-secondary'}`}
+                        style={{ flex: 1, padding: '10px', fontSize: '13px', fontWeight: 'bold' }}
+                        onClick={() => setRightPanelTab('risk')}
+                      >
+                        🛡️ Risk Analysis
+                      </button>
+                      <button 
+                        className={`btn ${rightPanelTab === 'chat' ? '' : 'btn-secondary'}`}
+                        style={{ flex: 1, padding: '10px', fontSize: '13px', fontWeight: 'bold' }}
+                        onClick={() => setRightPanelTab('chat')}
+                      >
+                        💬 Ask AI Chat
+                      </button>
+                    </div>
+
+                    {rightPanelTab === 'risk' ? (
+                      activeVersionObj?.analysis ? (
+                        <div className="glass-card">
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                            <h2 className="section-title" style={{ margin: 0 }}>AI Risk Analysis</h2>
+                            
+                            {/* Analyze Contract Button inside studio */}
+                            <button 
+                              className="btn btn-secondary" 
+                              style={{ padding: '8px 16px', fontSize: '13px' }} 
+                              onClick={() => triggerStudioAnalysis(selectedContract.id)}
+                              disabled={isAnalyzing}
+                            >
+                              {isAnalyzing ? (
+                                <>
+                                  <span className="spinner"></span> Analyzing...
+                                </>
+                              ) : (
+                                '🔄 Re-Run AI Analysis'
+                              )}
+                            </button>
+                          </div>
+
+                          {/* Overall Risk Score Gauge (0-100 color-coded) */}
+                          {(() => {
+                            const riskLevel = activeVersionObj.analysis.summary.overallRiskLevel || 'LOW';
+                            const riskScore = riskLevel === 'HIGH' ? 85 : riskLevel === 'MEDIUM' ? 50 : 15;
+                            const riskColor = riskLevel === 'HIGH' ? '#f87171' : riskLevel === 'MEDIUM' ? '#fbbf24' : '#34d399';
+                            return (
+                              <div className="risk-gauge-container">
+                                <div className="risk-gauge-visual">
+                                  <svg width="120" height="120" viewBox="0 0 120 120">
+                                    <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" />
+                                    <circle 
+                                      cx="60" 
+                                      cy="60" 
+                                      r="50" 
+                                      fill="none" 
+                                      stroke={riskColor} 
+                                      strokeWidth="10" 
+                                      strokeDasharray="314.16" 
+                                      strokeDashoffset={314.16 - (314.16 * riskScore) / 100}
+                                      strokeLinecap="round"
+                                      transform="rotate(-90 60 60)"
+                                      style={{ transition: 'stroke-dashoffset 0.8s ease-in-out' }}
+                                    />
+                                    <text x="60" y="65" textAnchor="middle" fill="#fff" fontSize="22" fontWeight="bold">
+                                      {riskScore}
+                                    </text>
+                                  </svg>
+                                  <div className="risk-gauge-label">
+                                    <span className="risk-gauge-title">Risk Index</span>
+                                    <span style={{ color: riskColor, fontWeight: 'bold', fontSize: 13 }}>{riskLevel} RISK</span>
+                                  </div>
+                                </div>
+                                
+                                <div className="risk-gauge-summary">
+                                  <h3 className="input-label" style={{ fontSize: 13, marginBottom: 6 }}>Executive Summary</h3>
+                                  <p style={{ fontSize: 13, color: '#cbd5e1', margin: 0, lineHeight: 1.5 }}>
+                                    {activeVersionObj.analysis.summary.summaryText}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {activeVersionObj.analysis.keyTerms && activeVersionObj.analysis.keyTerms.length > 0 && (
+                            <div style={{ marginTop: 20, padding: 16, borderRadius: 10, background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                              <h3 className="input-label" style={{ fontSize: 13, marginBottom: 8, color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'none', letterSpacing: 'normal' }}>
+                                🔑 Key Terms & Highlights
+                              </h3>
+                              <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: '#cbd5e1', lineHeight: 1.6 }}>
+                                {activeVersionObj.analysis.keyTerms.map((term, index) => (
+                                  <li key={index} style={{ marginBottom: 4 }}>{term}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Expandable High-Risk Clauses Accordion */}
+                          <div style={{ marginTop: 25 }}>
+                            <h3 className="input-label" style={{ fontSize: 14, marginBottom: 12 }}>Identified Clauses & suggested mitigations</h3>
+                            <div className="accordion-list">
+                              {activeVersionObj.analysis.riskClauses.map((rc, idx) => (
+                                <details key={idx} className="accordion-item">
+                                  <summary className="accordion-header">
+                                    <span className="accordion-title">{rc.title}</span>
+                                    <span className={`badge badge-${rc.riskLevel.toLowerCase()}`} style={{ marginLeft: 'auto', marginRight: 10 }}>{rc.riskLevel}</span>
+                                  </summary>
+                                  <div className="accordion-content">
+                                    <p className="clause-text">"{rc.clauseText}"</p>
+                                    <div className="clause-mitigation">
+                                      💡 <strong>Mitigation:</strong> {rc.mitigation}
+                                    </div>
+                                  </div>
+                                </details>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="glass-card" style={{ textAlign: 'center', padding: '60px 20px' }}>
+                          <div style={{ fontSize: '48px', marginBottom: 20 }}>📊</div>
+                          <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#fff', marginBottom: 10 }}>AI Legal Report Pending</h3>
+                          <p style={{ color: '#94a3b8', fontSize: '14px', maxWidth: '360px', margin: '0 auto 24px', lineHeight: 1.5 }}>
+                            No AI evaluation has been executed for this contract version yet.
+                          </p>
                           
-                          {/* Analyze Contract Button inside studio */}
                           <button 
-                            className="btn btn-secondary" 
-                            style={{ padding: '8px 16px', fontSize: '13px' }} 
+                            className="btn" 
+                            style={{ padding: '12px 24px' }}
                             onClick={() => triggerStudioAnalysis(selectedContract.id)}
                             disabled={isAnalyzing}
                           >
                             {isAnalyzing ? (
                               <>
-                                <span className="spinner"></span> Analyzing...
+                                <span className="spinner"></span> Generating AI Review...
                               </>
                             ) : (
-                              '🔄 Re-Run AI Analysis'
+                              'Analyze Contract'
                             )}
                           </button>
                         </div>
-
-                        {/* Overall Risk Score Gauge (0-100 color-coded) */}
-                        {(() => {
-                          const riskLevel = activeVersionObj.analysis.summary.overallRiskLevel || 'LOW';
-                          const riskScore = riskLevel === 'HIGH' ? 85 : riskLevel === 'MEDIUM' ? 50 : 15;
-                          const riskColor = riskLevel === 'HIGH' ? '#f87171' : riskLevel === 'MEDIUM' ? '#fbbf24' : '#34d399';
-                          return (
-                            <div className="risk-gauge-container">
-                              <div className="risk-gauge-visual">
-                                <svg width="120" height="120" viewBox="0 0 120 120">
-                                  <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" />
-                                  <circle 
-                                    cx="60" 
-                                    cy="60" 
-                                    r="50" 
-                                    fill="none" 
-                                    stroke={riskColor} 
-                                    strokeWidth="10" 
-                                    strokeDasharray="314.16" 
-                                    strokeDashoffset={314.16 - (314.16 * riskScore) / 100}
-                                    strokeLinecap="round"
-                                    transform="rotate(-90 60 60)"
-                                    style={{ transition: 'stroke-dashoffset 0.8s ease-in-out' }}
-                                  />
-                                  <text x="60" y="65" textAnchor="middle" fill="#fff" fontSize="22" fontWeight="bold">
-                                    {riskScore}
-                                  </text>
-                                </svg>
-                                <div className="risk-gauge-label">
-                                  <span className="risk-gauge-title">Risk Index</span>
-                                  <span style={{ color: riskColor, fontWeight: 'bold', fontSize: 13 }}>{riskLevel} RISK</span>
-                                </div>
-                              </div>
-                              
-                              <div className="risk-gauge-summary">
-                                <h3 className="input-label" style={{ fontSize: 13, marginBottom: 6 }}>Executive Summary</h3>
-                                <p style={{ fontSize: 13, color: '#cbd5e1', margin: 0, lineHeight: 1.5 }}>
-                                  {activeVersionObj.analysis.summary.summaryText}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })()}
-
-                        {/* Expandable High-Risk Clauses Accordion */}
-                        <div style={{ marginTop: 25 }}>
-                          <h3 className="input-label" style={{ fontSize: 14, marginBottom: 12 }}>Identified Clauses & suggested mitigations</h3>
-                          <div className="accordion-list">
-                            {activeVersionObj.analysis.riskClauses.map((rc, idx) => (
-                              <details key={idx} className="accordion-item">
-                                <summary className="accordion-header">
-                                  <span className="accordion-title">{rc.title}</span>
-                                  <span className={`badge badge-${rc.riskLevel.toLowerCase()}`} style={{ marginLeft: 'auto', marginRight: 10 }}>{rc.riskLevel}</span>
-                                </summary>
-                                <div className="accordion-content">
-                                  <p className="clause-text">"{rc.clauseText}"</p>
-                                  <div className="clause-mitigation">
-                                    💡 <strong>Mitigation:</strong> {rc.mitigation}
-                                  </div>
-                                </div>
-                              </details>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
+                      )
                     ) : (
-                      <div className="glass-card" style={{ textAlign: 'center', padding: '60px 20px' }}>
-                        <div style={{ fontSize: '48px', marginBottom: 20 }}>📊</div>
-                        <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#fff', marginBottom: 10 }}>AI Legal Report Pending</h3>
-                        <p style={{ color: '#94a3b8', fontSize: '14px', maxWidth: '360px', margin: '0 auto 24px', lineHeight: 1.5 }}>
-                          No AI evaluation has been executed for this contract version yet.
-                        </p>
-                        
-                        <button 
-                          className="btn" 
-                          style={{ padding: '12px 24px' }}
-                          onClick={() => triggerStudioAnalysis(selectedContract.id)}
-                          disabled={isAnalyzing}
-                        >
-                          {isAnalyzing ? (
-                            <>
-                              <span className="spinner"></span> Generating AI Review...
-                            </>
+                      <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', height: '600px' }}>
+                        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 12, marginBottom: 15 }}>
+                          <h2 className="section-title" style={{ margin: 0, fontSize: 16 }}>
+                            Ask AI About This Contract
+                          </h2>
+                          <p className="sub-title" style={{ margin: 0, marginTop: 4, fontSize: 12 }}>
+                            Ask questions about terms, liabilities, or specific clauses in version {selectedVersion}.
+                          </p>
+                        </div>
+
+                        {/* Chat Messages Stream */}
+                        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 15, paddingRight: 5 }}>
+                          {(chatMessages[selectedContract.id] || []).length === 0 ? (
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: '#64748b', padding: '0 20px', textAlign: 'center' }}>
+                              <span style={{ fontSize: 32, marginBottom: 10 }}>🤖</span>
+                              <p style={{ margin: 0, fontSize: 14, fontWeight: '600', color: '#e2e8f0' }}>Contract RAG Assistant</p>
+                              <p style={{ margin: 0, marginTop: 6, fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>
+                                Ask queries like: <br />
+                                <i>"What are the payment terms?"</i> or <br />
+                                <i>"What happens if we terminate early?"</i>
+                              </p>
+                            </div>
                           ) : (
-                            'Analyze Contract'
+                            (chatMessages[selectedContract.id] || []).map((msg, idx) => (
+                              <div 
+                                key={idx} 
+                                style={{
+                                  alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start',
+                                  maxWidth: '85%',
+                                  padding: '10px 14px',
+                                  borderRadius: 12,
+                                  fontSize: 13,
+                                  lineHeight: 1.5,
+                                  whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word',
+                                  background: msg.sender === 'user' ? '#8b5cf6' : 'rgba(255,255,255,0.04)',
+                                  color: msg.sender === 'user' ? '#fff' : '#cbd5e1',
+                                  border: msg.sender === 'user' ? 'none' : '1px solid rgba(255,255,255,0.06)'
+                                }}
+                              >
+                                {msg.text}
+                              </div>
+                            ))
                           )}
-                        </button>
+                          {isSendingChat && (
+                            <div style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', color: '#64748b', fontSize: 13 }}>
+                              <span className="spinner" style={{ width: 14, height: 14 }}></span>
+                              <span>AI is reading contract chunks...</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Input Form */}
+                        <form onSubmit={handleSendChatMessage} style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 15, display: 'flex', gap: 10 }}>
+                          <input 
+                            type="text" 
+                            className="input-field" 
+                            placeholder="Type question about this agreement..."
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value)}
+                            style={{ flex: 1, padding: '12px', fontSize: 13, margin: 0, color: '#fff' }}
+                            disabled={isSendingChat}
+                          />
+                          <button 
+                            type="submit" 
+                            className="btn" 
+                            style={{ padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            disabled={isSendingChat || !chatInput.trim()}
+                          >
+                            Send
+                          </button>
+                        </form>
                       </div>
                     )}
                   </div>
@@ -1328,6 +1510,7 @@ function App() {
                           <th>Contract Title</th>
                           <th>Version</th>
                           <th>Uploaded File</th>
+                          <th>Expiration Date</th>
                           <th>Risk Assessment</th>
                           <th>Actions</th>
                         </tr>
@@ -1341,6 +1524,15 @@ function App() {
                               <td style={{ fontWeight: '600' }}>{doc.title}</td>
                               <td><span className="badge badge-medium">v{doc.currentVersion}</span></td>
                               <td style={{ color: '#94a3b8', fontSize: 13 }}>📄 {doc.originalFilename}</td>
+                              <td>
+                                {doc.expirationDate ? (
+                                  <span className="badge" style={{ background: 'rgba(167, 139, 250, 0.1)', color: '#a78bfa', border: '1px solid rgba(167, 139, 250, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px' }}>
+                                    📅 {doc.expirationDate}
+                                  </span>
+                                ) : (
+                                  <span style={{ color: '#64748b', fontSize: 12 }}>—</span>
+                                )}
+                              </td>
                               <td>
                                 <span className={`badge badge-${riskLevel.toLowerCase()}`}>
                                   {riskLevel}

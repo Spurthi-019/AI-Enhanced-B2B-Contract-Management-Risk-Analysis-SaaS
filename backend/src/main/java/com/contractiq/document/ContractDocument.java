@@ -33,6 +33,8 @@ public class ContractDocument {
 
     private String storedFilePath;
 
+    private String expirationDate;
+
     @CreatedDate
     private LocalDateTime createdAt;
 }

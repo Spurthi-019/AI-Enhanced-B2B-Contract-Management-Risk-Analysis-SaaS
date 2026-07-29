@@ -55,3 +55,4 @@ security:
 logging:
   level:
     org.springframework.security: DEBUG
+    com.contractiq: DEBUG
