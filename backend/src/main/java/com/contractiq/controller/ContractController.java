@@ -456,6 +456,14 @@ public class ContractController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
         }
 
+        // Verify ROLE_ADMIN for delete contract
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        boolean isAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (!isAdmin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied: Only Workspace Administrators can delete contracts");
+        }
+
         // 1. Delete file on disk
         if (contractDoc.getStoredFilePath() != null) {
             try {

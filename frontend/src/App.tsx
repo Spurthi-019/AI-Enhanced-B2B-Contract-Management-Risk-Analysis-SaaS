@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 
 interface Comment {
@@ -51,11 +51,437 @@ interface AuditActivity {
 
 const BACKEND_URL = 'http://localhost:8081';
 
+const parseJwt = (token: string) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+};
+
+interface LandingPageProps {
+  token: string | null;
+  navigate: (to: string) => void;
+  showToast: (msg: string) => void;
+}
+
+function LandingPage({ token, navigate, showToast }: LandingPageProps) {
+  const [emailInput, setEmailInput] = React.useState('');
+
+  const handleQuickRegister = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (emailInput.trim()) {
+      localStorage.setItem('quickEmail', emailInput.trim());
+      navigate('/register');
+    }
+  };
+
+  return (
+    <div className="bg-[#0F172A] text-slate-100 min-h-screen font-sans overflow-x-hidden">
+      <style>{`
+        @keyframes scan {
+          0% { transform: translateY(0); opacity: 0.4; }
+          50% { transform: translateY(240px); opacity: 1; }
+          100% { transform: translateY(0); opacity: 0.4; }
+        }
+        .animate-scan {
+          animation: scan 3.5s ease-in-out infinite;
+        }
+      `}</style>
+
+      {/* Navigation Header */}
+      <header className="sticky top-0 z-50 backdrop-blur-md bg-[#0F172A]/80 border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
+            <span className="text-2xl font-bold bg-gradient-to-r from-indigo-400 via-violet-400 to-emerald-400 bg-clip-text text-transparent">
+              ContractIQ
+            </span>
+            <span className="bg-[#ef4444]/15 border border-[#ef4444]/20 text-[#f87171] text-[10px] px-2 py-0.5 rounded-full font-bold">AI v2.0</span>
+          </div>
+
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
+            <a href="#features" className="hover:text-violet-400 transition-colors">Features</a>
+            <a href="#workflow" className="hover:text-violet-400 transition-colors">How It Works</a>
+            <a href="#pricing" className="hover:text-violet-400 transition-colors">Pricing</a>
+            <a href="#security" className="hover:text-violet-400 transition-colors">Security</a>
+          </nav>
+
+          <div className="flex items-center gap-4">
+            {token ? (
+              <button 
+                className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-violet-500/20 transition-all duration-300 transform hover:-translate-y-0.5"
+                onClick={() => navigate('/dashboard')}
+              >
+                Go to Dashboard →
+              </button>
+            ) : (
+              <>
+                <button 
+                  className="text-slate-300 hover:text-white px-4 py-2 text-sm font-semibold transition-colors"
+                  onClick={() => navigate('/login')}
+                >
+                  Sign In
+                </button>
+                <button 
+                  className="bg-violetAccent hover:bg-[#4f46e5] text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-violetAccent/25 transition-all duration-300 transform hover:-translate-y-0.5"
+                  onClick={() => navigate('/register')}
+                >
+                  Get Started Free
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <section className="relative max-w-7xl mx-auto px-6 pt-20 pb-24 grid md:grid-cols-2 gap-12 items-center">
+        <div className="flex flex-col gap-6">
+          <div className="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 px-3.5 py-1.5 rounded-full text-xs font-semibold w-fit">
+            ✨ Next-Gen SaaS Legal Compliance Engine
+          </div>
+          <h1 className="text-4xl lg:text-5xl font-black tracking-tight leading-tight text-white">
+            AI-Powered Contract Review & <span className="bg-gradient-to-r from-violet-400 to-emerald-400 bg-clip-text text-transparent">Risk Analysis</span> Platform
+          </h1>
+          <p className="text-base lg:text-lg text-slate-400 leading-relaxed max-w-xl">
+            Instantly upload legal agreements, extract critical expirations, surface compliance risk scores, and collaborate securely with external counterparties.
+          </p>
+
+          <form onSubmit={handleQuickRegister} className="flex flex-col sm:flex-row gap-3 mt-4 max-w-md">
+            <input 
+              type="email" 
+              placeholder="Enter company email" 
+              className="bg-slate-900 border border-slate-700 focus:border-violet-505 rounded-lg px-4 py-3.5 text-sm text-white focus:outline-none flex-grow shadow-inner"
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              required
+            />
+            <button 
+              type="submit" 
+              className="bg-emeraldIndicator hover:bg-emerald-400 text-slate-950 font-bold px-6 py-3.5 rounded-lg text-sm transition-all duration-300 shadow-lg shadow-emeraldIndicator/20 hover:-translate-y-0.5 whitespace-nowrap"
+            >
+              Get Started Free
+            </button>
+          </form>
+        </div>
+
+        {/* Interactive Animated Mockup Card */}
+        <div className="relative mx-auto md:ml-auto w-full max-w-[440px] bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur-md overflow-hidden h-[340px]">
+          {/* Glowing laser line scan */}
+          <div className="absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_15px_#10B981] opacity-70 animate-scan z-10"></div>
+          
+          <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-red-500"></span>
+              <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
+              <span className="w-3 h-3 rounded-full bg-green-500"></span>
+            </div>
+            <div className="text-xs text-slate-400 font-mono">vendor-agreement-v3.pdf</div>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between bg-slate-955 border border-slate-800 p-3 rounded-xl">
+              <div>
+                <div className="text-[11px] text-slate-500 font-semibold tracking-wider uppercase">Active Evaluation</div>
+                <div className="text-sm font-bold text-white mt-0.5">SaaS Service Agreement</div>
+              </div>
+              <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-1 rounded-full text-xs font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                SCANNING
+              </div>
+            </div>
+
+            <div className="space-y-2 text-[11px] text-slate-500 font-mono">
+              <p className="bg-slate-950/40 p-2 rounded border border-slate-800/40">1. LICENSE GRANT. Counterparty hereby grants a non-exclusive, non-transferable perpetual license...</p>
+              <div className="flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 p-2 rounded-lg text-xs">
+                ⚠️ <strong>IP Clause:</strong> Moderate risk. Broad IP coverage.
+              </div>
+              <p className="bg-slate-950/40 p-2 rounded border border-slate-800/40">2. LIMITATION OF LIABILITY. In no event shall either party's aggregate liability exceed 5x...</p>
+              <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 p-2 rounded-lg text-xs">
+                🚨 <strong>Limitation of Liability:</strong> HIGH RISK (92/100).
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between mt-2 pt-3 border-t border-slate-850">
+              <span className="text-xs text-slate-400">Risk Assessment Index</span>
+              <span className="text-sm font-black text-red-400">82% HIGH RISK</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Social Proof & Metrics Bar */}
+      <section className="border-y border-slate-800 bg-slate-950/40">
+        <div className="max-w-7xl mx-auto px-6 py-12 flex flex-col lg:flex-row justify-between items-center gap-8">
+          <div className="text-slate-400 text-sm font-semibold tracking-wider uppercase text-center lg:text-left lg:max-w-xs">
+            Trusted by enterprise legal & procurement teams
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-8 md:gap-16 w-full lg:w-auto">
+            <div className="flex flex-col items-center lg:items-start">
+              <span className="text-3xl font-black text-white bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">10x</span>
+              <span className="text-xs text-slate-500 font-medium uppercase tracking-wider mt-1">Faster Review Cycles</span>
+            </div>
+            <div className="flex flex-col items-center lg:items-start">
+              <span className="text-3xl font-black text-white bg-gradient-to-r from-emeraldIndicator to-teal-400 bg-clip-text text-transparent">99.8%</span>
+              <span className="text-xs text-slate-500 font-medium uppercase tracking-wider mt-1">Risk Identification</span>
+            </div>
+            <div className="flex flex-col items-center lg:items-start col-span-2 md:col-span-1">
+              <span className="text-3xl font-black text-white bg-gradient-to-r from-violet-400 to-emeraldIndicator bg-clip-text text-transparent">$1.2M</span>
+              <span className="text-xs text-slate-500 font-medium uppercase tracking-wider mt-1">Average Dispute Savings</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Highlights Grid */}
+      <section id="features" className="max-w-7xl mx-auto px-6 py-24">
+        <div className="text-center max-w-2xl mx-auto mb-16">
+          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">Complete AI Contract Lifecycle Control</h2>
+          <p className="text-slate-400 text-sm lg:text-base">Everything legal teams need to automate risk scoring, audit compliance, and close deals faster.</p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-8">
+          <div className="bg-slate-900/40 border border-slate-800 p-8 rounded-2xl hover:border-slate-700 transition-all duration-300 group">
+            <span className="text-3xl">🤖</span>
+            <h3 className="text-lg font-bold text-white mt-4 mb-2 group-hover:text-violet-400 transition-colors">Instant AI Clause Analysis</h3>
+            <p className="text-sm text-slate-400 leading-relaxed">
+              Upload PDF agreements and run instant semantic risk checks against custom-tuned Ollama LLM models. Surface liabilities and mitigations instantly.
+            </p>
+          </div>
+          <div className="bg-slate-900/40 border border-slate-800 p-8 rounded-2xl hover:border-slate-700 transition-all duration-300 group">
+            <span className="text-3xl">🛡️</span>
+            <h3 className="text-lg font-bold text-white mt-4 mb-2 group-hover:text-violet-400 transition-colors">Tenant Isolation & Security</h3>
+            <p className="text-sm text-slate-400 leading-relaxed">
+              Strict workspace data isolation ensures your vectors and contracts are entirely isolated by tenant key claims. Granular user roles block access for reviewers.
+            </p>
+          </div>
+          <div className="bg-slate-900/40 border border-slate-800 p-8 rounded-2xl hover:border-slate-700 transition-all duration-300 group">
+            <span className="text-3xl">✉️</span>
+            <h3 className="text-lg font-bold text-white mt-4 mb-2 group-hover:text-violet-400 transition-colors">Magic Link Vendor Collaboration</h3>
+            <p className="text-sm text-slate-400 leading-relaxed">
+              Share secure passwordless links with vendors. Counterparties can reply to public comment threads and upload revised contract versions directly.
+            </p>
+          </div>
+          <div className="bg-slate-900/40 border border-slate-800 p-8 rounded-2xl hover:border-slate-700 transition-all duration-300 group">
+            <span className="text-3xl">💬</span>
+            <h3 className="text-lg font-bold text-white mt-4 mb-2 group-hover:text-violet-400 transition-colors">"Ask Me Anything" Chat</h3>
+            <p className="text-sm text-slate-400 leading-relaxed">
+              Use a robust PGVector Similarity-Search context RAG system to chat with your agreement. Get direct citations and legal answers.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* How-It-Works Workflow Section */}
+      <section id="workflow" className="border-t border-slate-800 bg-slate-950/20 py-24">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <h2 className="text-3xl font-bold text-white mb-4">Simplified Compliance Workflow</h2>
+            <p className="text-slate-400 text-sm">Move from upload to signature in minutes instead of weeks.</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8 relative">
+            <div className="flex flex-col items-center text-center p-6 bg-slate-900/40 border border-slate-800 rounded-xl">
+              <div className="w-12 h-12 rounded-full bg-violet-600/10 border border-violet-500/20 flex items-center justify-center text-xl text-violet-405 font-bold mb-4">
+                1
+              </div>
+              <h3 className="text-base font-bold text-white mb-2">Upload Agreement</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">Drag and drop your B2B contract PDF. ContractIQ registers metadata and extracts key timelines.</p>
+            </div>
+            <div className="flex flex-col items-center text-center p-6 bg-slate-900/40 border border-slate-800 rounded-xl">
+              <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-xl text-emerald-400 font-bold mb-4">
+                2
+              </div>
+              <h3 className="text-base font-bold text-white mb-2">AI Risk Audit</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">AI analyzes clauses, highlights vulnerabilities, and indexes text for instant assistant RAG queries.</p>
+            </div>
+            <div className="flex flex-col items-center text-center p-6 bg-slate-900/40 border border-slate-800 rounded-xl">
+              <div className="w-12 h-12 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-xl text-indigo-400 font-bold mb-4">
+                3
+              </div>
+              <h3 className="text-base font-bold text-white mb-2">Vendor Alignment</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">Share access via passwordless secure review. Align, reply, upload revisions, and close quickly.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SaaS Pricing Cards */}
+      <section id="pricing" className="border-t border-slate-800 py-24">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <h2 className="text-3xl font-bold text-white mb-4">Flexible SaaS Pricing Plans</h2>
+            <p className="text-slate-400 text-sm">Choose the access tier tailored to your legal compliance team size.</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {/* Starter Plan */}
+            <div className="bg-slate-900/40 border border-slate-850 p-8 rounded-2xl flex flex-col justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-white mb-1">Sandbox Starter</h3>
+                <p className="text-xs text-slate-500 font-medium">For individual legal specialists & tests</p>
+                <div className="my-6">
+                  <span className="text-4xl font-black text-white">$0</span>
+                  <span className="text-slate-500 text-sm"> / month</span>
+                </div>
+                <ul className="space-y-3 text-xs text-slate-400 border-t border-slate-800/60 pt-6">
+                  <li className="flex items-center gap-2">✓ Up to 5 uploaded agreements</li>
+                  <li className="flex items-center gap-2">✓ Basic AI clause evaluation</li>
+                  <li className="flex items-center gap-2">✓ Single user seat access</li>
+                  <li className="flex items-center gap-2">✓ Standard community support</li>
+                </ul>
+              </div>
+              <button 
+                className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-4 rounded-lg text-sm mt-8 transition-colors border border-slate-700"
+                onClick={() => navigate('/register')}
+              >
+                Start Sandbox Free
+              </button>
+            </div>
+
+            {/* Professional Plan */}
+            <div className="bg-slate-900/60 border-2 border-violet-500 p-8 rounded-2xl flex flex-col justify-between relative">
+              <div className="absolute top-0 right-6 transform -translate-y-1/2 bg-violet-600 text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full">
+                Most Popular
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white mb-1">Professional Reviewer</h3>
+                <p className="text-xs text-slate-300 font-medium">For mid-market legal & business operations</p>
+                <div className="my-6">
+                  <span className="text-4xl font-black text-white">$149</span>
+                  <span className="text-slate-400 text-sm"> / month</span>
+                </div>
+                <ul className="space-y-3 text-xs text-slate-300 border-t border-violet-900/30 pt-6">
+                  <li className="flex items-center gap-2 text-violet-405">✓ Up to 50 active contracts</li>
+                  <li className="flex items-center gap-2">✓ 5 collaborator seats</li>
+                  <li className="flex items-center gap-2">✓ Full AI Risk Analysis & scores</li>
+                  <li className="flex items-center gap-2">✓ Secure passwordless vendor portals</li>
+                  <li className="flex items-center gap-2">✓ "Ask AI" chat assistant access</li>
+                </ul>
+              </div>
+              <button 
+                className="w-full bg-violetAccent hover:bg-[#4f46e5] text-white font-bold py-3 px-4 rounded-lg text-sm mt-8 shadow-lg shadow-violetAccent/25 transition-all"
+                onClick={() => navigate('/register')}
+              >
+                Go Professional
+              </button>
+            </div>
+
+            {/* Enterprise Plan */}
+            <div className="bg-slate-900/40 border border-slate-850 p-8 rounded-2xl flex flex-col justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-white mb-1">Enterprise Elite</h3>
+                <p className="text-xs text-slate-500 font-medium">For large procurement & compliance divisions</p>
+                <div className="my-6">
+                  <span className="text-4xl font-black text-white">$499</span>
+                  <span className="text-slate-500 text-sm"> / month</span>
+                </div>
+                <ul className="space-y-3 text-xs text-slate-400 border-t border-slate-800/60 pt-6">
+                  <li className="flex items-center gap-2">✓ Unlimited uploaded agreements</li>
+                  <li className="flex items-center gap-2">✓ Uncapped seats & review versions</li>
+                  <li className="flex items-center gap-2">✓ Isolated vector indexing SLA</li>
+                  <li className="flex items-center gap-2">✓ Custom AI prompts tuning</li>
+                  <li className="flex items-center gap-2">✓ 24/7 dedicated account manager</li>
+                </ul>
+              </div>
+              <button 
+                className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-4 rounded-lg text-sm mt-8 transition-colors border border-slate-700"
+                onClick={() => navigate('/register')}
+              >
+                Contact Enterprise Sales
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Security Shield Callout */}
+      <section id="security" className="border-t border-slate-850 bg-slate-950/50 py-16 text-center">
+        <div className="max-w-2xl mx-auto px-6 flex flex-col items-center gap-4">
+          <span className="text-4xl">🛡️</span>
+          <h3 className="text-xl font-bold text-white">Military-Grade Multi-Tenant Isolation</h3>
+          <p className="text-slate-400 text-xs leading-relaxed">
+            ContractIQ guarantees strict multi-tenant isolation. No private data is ever shared across organizations, and metadata/vector storage are strictly mapped via tenant credentials.
+          </p>
+          <div className="flex items-center gap-3 bg-slate-900 px-4 py-2 rounded-full border border-slate-800 text-[11px] text-slate-400 font-mono mt-2">
+            🛡️ SOC-2 TYPE II COMPLIANCE ASSURED • SSL ENCRYPTED
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-850 py-12 bg-slate-950">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold bg-gradient-to-r from-violet-400 to-emeraldIndicator bg-clip-text text-transparent">
+              ContractIQ
+            </span>
+            <span className="text-xs text-slate-500 font-mono">© 2026. All rights reserved.</span>
+          </div>
+          <div className="flex items-center gap-6 text-xs text-slate-500">
+            <a href="#" className="hover:text-slate-300">Privacy Policy</a>
+            <a href="#" className="hover:text-slate-300">Terms of Service</a>
+            <a href="#" className="hover:text-slate-300">Compliance & Security</a>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
 function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [email, setEmail] = useState('test@contractiq.com');
   const [password, setPassword] = useState('devpassword');
-  
+
+  useEffect(() => {
+    if (token) {
+      setCurrentUser(parseJwt(token));
+    } else {
+      setCurrentUser(null);
+    }
+  }, [token]);
+
+  const roles = currentUser?.roles || [];
+  const isAdmin = roles.includes('ROLE_ADMIN');
+  const isReviewer = roles.includes('ROLE_LEGAL_REVIEWER');
+  const isEmployee = roles.includes('ROLE_EMPLOYEE');
+
+  const getRoleDisplayName = () => {
+    if (isAdmin) return 'Workspace Admin';
+    if (isReviewer) return 'Legal Reviewer';
+    if (isEmployee) return 'Employee';
+    return 'User';
+  };
+
+  const [workspaceUsers, setWorkspaceUsers] = useState<any[]>([]);
+
+  const loadWorkspaceUsers = async (authToken: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/tenants/users`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      if (res.ok) {
+        const roster = await res.json();
+        setWorkspaceUsers(roster);
+      }
+    } catch (err) {
+      console.error("Error loading workspace users:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (token && isAdmin) {
+      loadWorkspaceUsers(token);
+    }
+  }, [token, isAdmin]);
+
   // Dashboard & Navigation states
   const [activeTab, setActiveTab] = useState<'dashboard' | 'contracts' | 'upload' | 'settings'>('dashboard');
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -96,7 +522,7 @@ function App() {
   const [showCommentsSidebar, setShowCommentsSidebar] = useState(true);
   const [showShareModal, setShowShareModal] = useState(false);
   const [registerCompany, setRegisterCompany] = useState('');
-  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerEmail, setRegisterEmail] = useState(localStorage.getItem('quickEmail') || '');
   const [registerPassword, setRegisterPassword] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -506,6 +932,7 @@ function App() {
         setRegisterCompany('');
         setRegisterEmail('');
         setRegisterPassword('');
+        localStorage.removeItem('quickEmail');
         navigate('/login');
       } else {
         const errText = await res.text();
@@ -561,6 +988,68 @@ function App() {
       }
     } catch (err) {
       showToast('Error connecting to vendor portal access gateway');
+    }
+  };
+
+  const [vendorUploadFile, setVendorUploadFile] = useState<File | null>(null);
+  const [isVendorUploading, setIsVendorUploading] = useState(false);
+
+  const handleVendorPostComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentContent || !vendorPortalToken) return;
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/vendor/portal/comment?token=${vendorPortalToken}`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ content: commentContent })
+      });
+      if (res.ok) {
+        const commentsList = await res.json();
+        setVendorPortalData(prev => ({
+          ...prev,
+          comments: commentsList
+        }));
+        setCommentContent('');
+        showToast('Comment posted successfully!');
+      } else {
+        showToast('Failed to submit vendor comment.');
+      }
+    } catch (err) {
+      showToast('Failed to post comment');
+    }
+  };
+
+  const handleVendorRevisionUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vendorUploadFile || !vendorPortalToken) {
+      showToast('Please select a PDF file first.');
+      return;
+    }
+    setIsVendorUploading(true);
+    const formData = new FormData();
+    formData.append('file', vendorUploadFile);
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/vendor/portal/upload?token=${vendorPortalToken}`, {
+        method: 'POST',
+        body: formData
+      });
+      if (res.ok) {
+        const updatedResponse = await res.json();
+        setVendorPortalData(updatedResponse);
+        setVendorUploadFile(null);
+        showToast('Revised counter-offer uploaded successfully!');
+      } else {
+        const txt = await res.text();
+        showToast(`Upload failed: ${txt}`);
+      }
+    } catch (err) {
+      showToast('Network error during revised upload');
+    } finally {
+      setIsVendorUploading(false);
     }
   };
 
@@ -739,6 +1228,45 @@ function App() {
                   )}
                 </div>
               </div>
+
+              {/* Vendor Comment Reply Form */}
+              <div className="glass-card" style={{ marginTop: 20 }}>
+                <h3 className="section-title" style={{ fontSize: 15, marginBottom: 12 }}>💬 Add Note / Reply</h3>
+                <form onSubmit={handleVendorPostComment}>
+                  <textarea 
+                    className="input-field" 
+                    placeholder="Type a public message for the review team..."
+                    value={commentContent}
+                    onChange={(e) => setCommentContent(e.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box', height: 80, padding: 10, fontSize: 13, marginBottom: 12, resize: 'none', background: 'rgba(30,41,59,0.5)', color: '#fff' }}
+                    required
+                  />
+                  <button type="submit" className="btn" style={{ width: '100%', padding: '10px' }}>
+                    Post Reply
+                  </button>
+                </form>
+              </div>
+
+              {/* Upload Revised Counter-Offer Version */}
+              <div className="glass-card" style={{ marginTop: 20 }}>
+                <h3 className="section-title" style={{ fontSize: 15, marginBottom: 12 }}>📤 Submit Revised Version</h3>
+                <p style={{ color: '#94a3b8', fontSize: 12, lineHeight: 1.4, marginBottom: 15 }}>
+                  Select and upload a revised PDF copy containing counter-offer terms to create a new review version.
+                </p>
+                <form onSubmit={handleVendorRevisionUpload}>
+                  <input 
+                    type="file" 
+                    className="input-file" 
+                    accept="application/pdf"
+                    onChange={(e) => setVendorUploadFile(e.target.files ? e.target.files[0] : null)}
+                    required
+                    style={{ marginBottom: 12, width: '100%' }}
+                  />
+                  <button type="submit" className="btn btn-secondary" style={{ width: '100%', padding: '10px' }} disabled={isVendorUploading}>
+                    {isVendorUploading ? 'Uploading Revision...' : 'Submit Revised Copy'}
+                  </button>
+                </form>
+              </div>
             </div>
           </div>
         ) : (
@@ -749,6 +1277,11 @@ function App() {
         )}
       </div>
     );
+  }
+
+  // Render Landing Page at '/'
+  if (currentPath === '/') {
+    return <LandingPage token={token} navigate={navigate} showToast={showToast} />;
   }
 
   // Render Register Page
@@ -1005,7 +1538,7 @@ function App() {
 
           <nav className="sidebar-nav">
             <button 
-              className={`nav-item ${currentPath === '/' || currentPath === '/dashboard' ? 'active' : ''}`}
+              className={`nav-item ${currentPath === '/dashboard' ? 'active' : ''}`}
               onClick={() => navigate('/dashboard')}
             >
               📊 Dashboard
@@ -1014,7 +1547,7 @@ function App() {
               className={`nav-item ${currentPath.startsWith('/contracts') ? 'active' : ''}`}
               onClick={() => navigate('/contracts')}
             >
-              📁 Contracts Collection
+              📁 {isAdmin ? 'All Contracts' : 'My Assigned Contracts'}
             </button>
             <button 
               className={`nav-item ${currentPath === '/upload' ? 'active' : ''}`}
@@ -1022,19 +1555,41 @@ function App() {
             >
               📤 Upload Center
             </button>
-            <button 
-              className={`nav-item ${currentPath === '/settings' ? 'active' : ''}`}
-              onClick={() => navigate('/settings')}
-            >
-              ⚙️ Settings
-            </button>
+            {isAdmin && (
+              <>
+                <button 
+                  className={`nav-item ${currentPath === '/users' ? 'active' : ''}`}
+                  onClick={() => navigate('/users')}
+                >
+                  👥 User Management
+                </button>
+                <button 
+                  className={`nav-item ${currentPath === '/billing' ? 'active' : ''}`}
+                  onClick={() => navigate('/billing')}
+                >
+                  💳 Billing & subscription
+                </button>
+                <button 
+                  className={`nav-item ${currentPath === '/audit' ? 'active' : ''}`}
+                  onClick={() => navigate('/audit')}
+                >
+                  📜 Audit Logs
+                </button>
+                <button 
+                  className={`nav-item ${currentPath === '/settings' ? 'active' : ''}`}
+                  onClick={() => navigate('/settings')}
+                >
+                  ⚙️ Workspace Settings
+                </button>
+              </>
+            )}
           </nav>
         </div>
 
         <div className="sidebar-footer">
           <div className="user-profile">
-            <span className="user-email">test@contractiq.com</span>
-            <span className="user-role">SaaS Administrator</span>
+            <span className="user-email">{currentUser?.email || 'user@contractiq.com'}</span>
+            <span className="user-role">{getRoleDisplayName()}</span>
           </div>
           <button className="btn btn-danger" style={{ width: '100%', padding: '10px' }} onClick={handleLogout}>
             Sign Out
@@ -1047,16 +1602,18 @@ function App() {
         
         {/* Tab 1: Dashboard Analytics */}
         {/* Tab 1: Dashboard Analytics */}
-        {(currentPath === '/' || currentPath === '/dashboard') && (
+        {currentPath === '/dashboard' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div>
                 <h1 className="main-title" style={{ margin: 0 }}>Workspace Analytics</h1>
                 <p className="sub-title" style={{ margin: 0, marginTop: 4 }}>Corporate contract management, compliance thresholds, and legal audit indexes.</p>
               </div>
-              <button className="btn" onClick={() => setShowInviteModal(true)}>
-                ➕ Invite Team Members
-              </button>
+              {isAdmin && (
+                <button className="btn" onClick={() => setShowInviteModal(true)}>
+                  ➕ Invite Team Members
+                </button>
+              )}
             </div>
 
             <div className="metrics-grid">
@@ -1543,9 +2100,11 @@ function App() {
                                   <button className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={() => navigate(`/contracts/${doc.id}`)}>
                                     Inspect Details
                                   </button>
-                                  <button className="btn btn-danger" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={() => handleDeleteContract(doc.id)}>
-                                    🗑️ Delete
-                                  </button>
+                                  {isAdmin && (
+                                    <button className="btn btn-danger" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={() => handleDeleteContract(doc.id)}>
+                                      🗑️ Delete
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -1621,7 +2180,7 @@ function App() {
         )}
 
         {/* Tab 4: System Settings */}
-        {currentPath === '/settings' && (
+        {currentPath === '/settings' && isAdmin && (
           <div className="glass-card" style={{ maxWidth: '600px', margin: '0 auto' }}>
             <h1 className="main-title">Tenant Settings</h1>
             <p className="sub-title">System keys, environment configs, and legal AI model options.</p>
@@ -1642,6 +2201,148 @@ function App() {
               <span className="input-label">Audit Log Level</span>
               <div style={{ color: '#34d399' }}>Active / Verbose logging</div>
             </div>
+          </div>
+        )}
+
+        {/* Tab 5: User Management */}
+        {currentPath === '/users' && isAdmin && (
+          <div className="glass-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <h1 className="main-title" style={{ margin: 0 }}>👥 Workspace User Management</h1>
+                <p className="sub-title" style={{ margin: 0, marginTop: 4 }}>Manage user roles, workspace rosters, and team collaboration invitations.</p>
+              </div>
+              <button className="btn" onClick={() => setShowInviteModal(true)}>
+                ➕ Invite Team Member
+              </button>
+            </div>
+
+            <table className="custom-table" style={{ marginTop: 20 }}>
+              <thead>
+                <tr>
+                  <th>Email Address</th>
+                  <th>Workspace Access Role</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workspaceUsers.map(u => {
+                  const roleName = u.roles.includes('ROLE_ADMIN') ? 'Workspace Admin' : 
+                                   u.roles.includes('ROLE_LEGAL_REVIEWER') ? 'Legal Reviewer' : 'Employee';
+                  return (
+                    <tr key={u.id}>
+                      <td style={{ fontWeight: '600' }}>{u.email}</td>
+                      <td>
+                        <span className={`badge ${u.roles.includes('ROLE_ADMIN') ? 'badge-high' : u.roles.includes('ROLE_LEGAL_REVIEWER') ? 'badge-medium' : 'badge-low'}`}>
+                          {roleName}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="badge" style={{ background: 'rgba(52, 211, 153, 0.1)', color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.2)' }}>
+                          ✓ Active Member
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Tab 6: Billing & Subscription */}
+        {currentPath === '/billing' && isAdmin && (
+          <div className="glass-card" style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <h1 className="main-title">💳 Billing & Subscription Plan</h1>
+            <p className="sub-title" style={{ marginBottom: 25 }}>Configure subscription tiers, usage quotas, and payment receipts.</p>
+
+            <div className="metrics-grid" style={{ marginBottom: 30 }}>
+              <div className="metric-card" style={{ background: 'linear-gradient(135deg, rgba(167, 139, 250, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)', border: '1px solid rgba(167, 139, 250, 0.15)' }}>
+                <span className="metric-label" style={{ color: '#c084fc' }}>Active Plan Tier</span>
+                <span className="metric-value" style={{ fontSize: 24, marginTop: 5 }}>Enterprise Pro</span>
+                <span className="metric-trend" style={{ color: '#a78bfa' }}>✓ Auto-renews Aug 24</span>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">Monthly Charge</span>
+                <span className="metric-value" style={{ fontSize: 24, marginTop: 5 }}>$499.00</span>
+                <span className="metric-trend">Invoice sent to company admin</span>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">Workspace User Seats</span>
+                <span className="metric-value" style={{ fontSize: 24, marginTop: 5 }}>{workspaceUsers.length} seats</span>
+                <span className="metric-trend">✓ Uncapped seats active</span>
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, padding: 20, marginBottom: 30 }}>
+              <h3 className="input-label" style={{ fontSize: 14, color: '#fff', marginBottom: 12 }}>Usage Metrics Quotas</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5 }}>
+                    <span style={{ color: '#cbd5e1' }}>RAG Vector Index Storage</span>
+                    <span style={{ color: '#94a3b8' }}>348 MB / 10 GB (3.48%)</span>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.05)', height: 6, borderRadius: 3 }}>
+                    <div style={{ background: '#a78bfa', width: '3.48%', height: '100%', borderRadius: 3 }}></div>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5 }}>
+                    <span style={{ color: '#cbd5e1' }}>AI Prompt Completions Limit</span>
+                    <span style={{ color: '#94a3b8' }}>872 / 10,000 queries</span>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.05)', height: 6, borderRadius: 3 }}>
+                    <div style={{ background: '#34d399', width: '8.72%', height: '100%', borderRadius: 3 }}></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <h3 className="input-label" style={{ fontSize: 14, color: '#fff', marginBottom: 15 }}>Available Upgrades</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              <div className="metric-card" style={{ textAlign: 'center', opacity: 0.6 }}>
+                <span className="metric-label" style={{ fontSize: 14, fontWeight: 'bold' }}>Legal Pro Plan</span>
+                <span className="metric-value" style={{ fontSize: 22, margin: '10px 0' }}>$149/mo</span>
+                <span className="metric-trend" style={{ fontSize: 11 }}>Limited to 50 contracts & 2,000 queries</span>
+              </div>
+              <div className="metric-card" style={{ textAlign: 'center', border: '2px solid #a78bfa', background: 'rgba(167, 139, 250, 0.02)' }}>
+                <div className="badge badge-high" style={{ alignSelf: 'center', marginBottom: 5 }}>Active Plan</div>
+                <span className="metric-label" style={{ fontSize: 14, fontWeight: 'bold', color: '#fff' }}>Enterprise Pro Plan</span>
+                <span className="metric-value" style={{ fontSize: 22, margin: '10px 0' }}>$499/mo</span>
+                <span className="metric-trend" style={{ fontSize: 11, color: '#a78bfa' }}>Unlimited contracts, vector storage & SLA support</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 7: Audit Logs */}
+        {currentPath === '/audit' && isAdmin && (
+          <div className="glass-card">
+            <h1 className="main-title">📜 Workspace Audit History Logs</h1>
+            <p className="sub-title" style={{ marginBottom: 20 }}>Trace actions, edits, versions, and security portal share operations.</p>
+
+            <table className="custom-table">
+              <thead>
+                <tr>
+                  <th>Audit Log Event Description</th>
+                  <th>Action Timestamp</th>
+                  <th>System Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activities.map(act => (
+                  <tr key={act.id}>
+                    <td style={{ fontWeight: '600' }}>⚡ {act.description}</td>
+                    <td style={{ color: '#94a3b8', fontSize: 13 }}>{act.timestamp}</td>
+                    <td>
+                      <span className="badge" style={{ background: 'rgba(52, 211, 153, 0.1)', color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.2)' }}>
+                        SUCCESS
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
