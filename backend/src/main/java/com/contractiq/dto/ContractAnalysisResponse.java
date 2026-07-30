@@ -14,4 +14,5 @@ public class ContractAnalysisResponse {
     private List<RiskClause> riskClauses;
     private String expirationDate;
     private List<String> keyTerms;
+    private ComplianceChecklist complianceChecklist;
 }

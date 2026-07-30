@@ -75,6 +75,11 @@ public class ContractAnalysisService {
                 1. Identify any risk items and provide mitigations.
                 2. Extract the expiration date or duration of the contract (e.g., "Expires in 1 year on 2027-07-28" or "Indefinite / Permanent" if not specified).
                 3. Extract 3-5 core key terms or highlights from the contract.
+                4. Fill the complianceChecklist object with statuses ("VERIFIED", "RISK_FLAGGED", "MISSING") and detailed explanations for:
+                   - gdprStatus and gdprDetails (Data Privacy & GDPR compliance)
+                   - indemnityStatus and indemnityDetails (Indemnification liabilities boundaries)
+                   - liabilityStatus and liabilityDetails (Limitation of liability caps)
+                   - govLawStatus and govLawDetails (Governing Law & Jurisdiction)
                 
                 Context:
                 {context}
@@ -144,6 +149,44 @@ public class ContractAnalysisService {
             "30-day unilateral termination for convenience",
             "Intellectual Property transfers to Client upon payment"
         ));
+
+        // Generate dynamic mock compliance checklist values
+        com.contractiq.dto.ComplianceChecklist compliance = new com.contractiq.dto.ComplianceChecklist();
+        String lowContext = contextText.toLowerCase();
+
+        if (lowContext.contains("gdpr") || lowContext.contains("privacy") || lowContext.contains("dpa") || lowContext.contains("verify")) {
+            compliance.setGdprStatus("VERIFIED");
+            compliance.setGdprDetails("GDPR and Data Processing Addendum (DPA) terms are clearly established with standard standard clauses.");
+        } else {
+            compliance.setGdprStatus("MISSING");
+            compliance.setGdprDetails("No Data Protection Addendum (DPA) or GDPR compliance standard references were detected.");
+        }
+
+        if (lowContext.contains("indemnity") || lowContext.contains("indemnif") || lowContext.contains("verify")) {
+            compliance.setIndemnityStatus("RISK_FLAGGED");
+            compliance.setIndemnityDetails("Broad unilateral indemnification observed under section 8 without standard liabilities limitations.");
+        } else {
+            compliance.setIndemnityStatus("MISSING");
+            compliance.setIndemnityDetails("No indemnification rules or client protections were specified in this agreement.");
+        }
+
+        if (lowContext.contains("liability") || lowContext.contains("verify")) {
+            compliance.setLiabilityStatus("RISK_FLAGGED");
+            compliance.setLiabilityDetails("Uncapped liability exception provisions for intellectual property claims pose financial risks.");
+        } else {
+            compliance.setLiabilityStatus("MISSING");
+            compliance.setLiabilityDetails("No limitation of liability clause or liability caps were found in the text.");
+        }
+
+        if (lowContext.contains("governing") || lowContext.contains("jurisdiction") || lowContext.contains("verify")) {
+            compliance.setGovLawStatus("VERIFIED");
+            compliance.setGovLawDetails("Governing law is standard (State of New York) with disputes routed to Manhattan state courts.");
+        } else {
+            compliance.setGovLawStatus("MISSING");
+            compliance.setGovLawDetails("Governing law and dispute resolution jurisdiction clauses are missing.");
+        }
+
+        response.setComplianceChecklist(compliance);
         return response;
     }
 }
