@@ -48,7 +48,10 @@ public class DbInitializer implements CommandLineRunner {
         // 1. Create default Tenant if none exist
         Tenant tenant;
         if (tenantRepository.count() == 0) {
-            tenant = new Tenant(null, "Default SaaS Tenant", LocalDateTime.now());
+            tenant = new Tenant();
+            tenant.setName("Default SaaS Tenant");
+            tenant.setCompanyName("Default SaaS Tenant");
+            tenant.setCreatedAt(LocalDateTime.now());
             tenant = tenantRepository.save(tenant);
             log.info("Created Default Tenant: {}", tenant.getId());
         } else {

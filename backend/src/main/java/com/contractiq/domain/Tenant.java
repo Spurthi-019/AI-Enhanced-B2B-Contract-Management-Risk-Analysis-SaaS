@@ -24,6 +24,20 @@ public class Tenant {
     @Column(nullable = false)
     private String name;
 
+    private String companyName;
+    private String domain;
+
+    @Column(name = "ai_model")
+    private String aiModel = "llama3";
+
+    @Column(name = "risk_sensitivity")
+    private String riskSensitivity = "MEDIUM";
+
+    @Column(name = "magic_link_expiry_days")
+    private Integer magicLinkExpiryDays = 7;
+
+    private String webhookUrl;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

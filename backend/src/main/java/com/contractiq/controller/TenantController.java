@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.Principal;
@@ -30,17 +31,20 @@ public class TenantController {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailNotificationService emailNotificationService;
+    private final com.contractiq.repository.TenantRepository tenantRepository;
 
     public TenantController(
             UserRepository userRepository,
             RoleRepository roleRepository,
             PasswordEncoder passwordEncoder,
-            EmailNotificationService emailNotificationService
+            EmailNotificationService emailNotificationService,
+            com.contractiq.repository.TenantRepository tenantRepository
     ) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.emailNotificationService = emailNotificationService;
+        this.tenantRepository = tenantRepository;
     }
 
     @PostMapping("/invite")
@@ -132,5 +136,79 @@ public class TenantController {
                 .collect(java.util.stream.Collectors.toList());
                 
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/settings")
+    public ResponseEntity<com.contractiq.dto.TenantSettingsDto> getTenantSettings(Principal principal) {
+        log.info("Request to get tenant settings received from user: {}", principal.getName());
+        
+        UUID userId = UUID.fromString(principal.getName());
+        User currentUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+                
+        Tenant tenant = currentUser.getTenant();
+        if (tenant == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Current user is not mapped to any tenant workspace");
+        }
+        
+        String companyName = tenant.getCompanyName();
+        if (companyName == null || companyName.trim().isEmpty()) {
+            companyName = tenant.getName();
+        }
+        
+        com.contractiq.dto.TenantSettingsDto dto = new com.contractiq.dto.TenantSettingsDto(
+                companyName,
+                tenant.getDomain(),
+                tenant.getAiModel(),
+                tenant.getRiskSensitivity(),
+                tenant.getMagicLinkExpiryDays(),
+                tenant.getWebhookUrl()
+        );
+        return ResponseEntity.ok(dto);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/settings")
+    @Transactional
+    public ResponseEntity<com.contractiq.dto.TenantSettingsDto> updateTenantSettings(
+            Principal principal,
+            @RequestBody com.contractiq.dto.TenantSettingsDto request
+    ) {
+        log.info("Request to update tenant settings received from user: {}", principal.getName());
+        
+        UUID userId = UUID.fromString(principal.getName());
+        User currentUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+                
+        // Admin role enforced by @PreAuthorize annotation 
+        Tenant tenant = currentUser.getTenant();
+        if (tenant == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Current user is not mapped to any tenant workspace");
+        }
+        
+        tenant.setCompanyName(request.getCompanyName());
+        tenant.setDomain(request.getDomain());
+        if (request.getAiModel() != null) {
+            tenant.setAiModel(request.getAiModel());
+        }
+        if (request.getRiskSensitivity() != null) {
+            tenant.setRiskSensitivity(request.getRiskSensitivity());
+        }
+        if (request.getMagicLinkExpiryDays() != null) {
+            tenant.setMagicLinkExpiryDays(request.getMagicLinkExpiryDays());
+        }
+        tenant.setWebhookUrl(request.getWebhookUrl());
+        
+        Tenant savedTenant = tenantRepository.save(tenant);
+        
+        com.contractiq.dto.TenantSettingsDto responseDto = new com.contractiq.dto.TenantSettingsDto(
+                savedTenant.getCompanyName() != null ? savedTenant.getCompanyName() : savedTenant.getName(),
+                savedTenant.getDomain(),
+                savedTenant.getAiModel(),
+                savedTenant.getRiskSensitivity(),
+                savedTenant.getMagicLinkExpiryDays(),
+                savedTenant.getWebhookUrl()
+        );
+        return ResponseEntity.ok(responseDto);
     }
 }
