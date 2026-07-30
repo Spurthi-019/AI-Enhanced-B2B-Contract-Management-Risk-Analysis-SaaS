@@ -351,6 +351,7 @@ function App() {
         // Auto trigger analysis
         triggerAnalysis(doc.id, doc.title);
         setActiveTab('contracts');
+        navigate('/contracts');
       } else {
         const errText = await res.text();
         showToast(`Upload failed: ${errText}`);
