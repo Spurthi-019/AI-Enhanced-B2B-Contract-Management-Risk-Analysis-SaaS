@@ -103,6 +103,22 @@ export function ContractDetail({
   const riskScore = riskLevel === 'HIGH' ? 85 : riskLevel === 'MEDIUM' ? 50 : 15;
   const riskColor = riskLevel === 'HIGH' ? '#fb7185' : riskLevel === 'MEDIUM' ? '#fcd34d' : '#34d399';
 
+  // Derived legal compliance checkers
+  const docText = activeVersionObj?.fullText?.toLowerCase() || '';
+  const clauses = activeVersionObj?.analysis?.riskClauses || [];
+
+  const matchesPrivacy = docText.includes('gdpr') || docText.includes('privacy') || docText.includes('dpa') || clauses.some(c => c.title.toLowerCase().includes('gdpr') || c.title.toLowerCase().includes('privacy'));
+  const privacyRisk = clauses.some(c => (c.title.toLowerCase().includes('gdpr') || c.title.toLowerCase().includes('privacy')) && c.riskLevel === 'HIGH');
+  
+  const matchesIndemnity = docText.includes('indemnity') || docText.includes('indemnif') || clauses.some(c => c.title.toLowerCase().includes('indemnity') || c.title.toLowerCase().includes('indemnif'));
+  const indemnityRisk = clauses.some(c => (c.title.toLowerCase().includes('indemnity') || c.title.toLowerCase().includes('indemnif')) && c.riskLevel === 'HIGH');
+
+  const matchesLiability = docText.includes('liability') || clauses.some(c => c.title.toLowerCase().includes('liability'));
+  const liabilityRisk = clauses.some(c => c.title.toLowerCase().includes('liability') && c.riskLevel === 'HIGH');
+
+  const matchesGovLaw = docText.includes('governing law') || docText.includes('jurisdiction') || docText.includes('applicable law') || clauses.some(c => c.title.toLowerCase().includes('governing') || c.title.toLowerCase().includes('jurisdiction'));
+  const govLawRisk = clauses.some(c => (c.title.toLowerCase().includes('governing') || c.title.toLowerCase().includes('jurisdiction')) && c.riskLevel === 'HIGH');
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* 1. Re-architected Top Banner & Header Bar */}
@@ -322,6 +338,70 @@ export function ContractDetail({
                       <p style={{ fontSize: '14px', color: '#cbd5e1', margin: 0, lineHeight: 1.6 }}>
                         {activeVersionObj.analysis.summary.summaryText}
                       </p>
+                    </div>
+                  </div>
+
+                  {/* ⚖️ Compliance & Governance Scorecard */}
+                  <div style={{ marginTop: 24, padding: 20, borderRadius: 12, background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <h3 className="input-label" style={{ fontSize: 13, marginBottom: 12, color: '#818cf8', textTransform: 'none', letterSpacing: 'normal', fontWeight: '600' }}>
+                      ⚖️ Compliance & Governance Scorecard
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                      {/* GDPR check */}
+                      <div className="security-item" style={{ border: privacyRisk ? '1px solid rgba(244, 63, 94, 0.2)' : matchesPrivacy ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(255,255,255,0.06)', background: privacyRisk ? 'rgba(244, 63, 94, 0.02)' : matchesPrivacy ? 'rgba(16, 185, 129, 0.02)' : 'transparent' }}>
+                        <span style={{ fontSize: 16 }}>🛡️</span>
+                        <div>
+                          <div className="security-label" style={{ color: '#fff' }}>Data Privacy & GDPR</div>
+                          <div className="security-value" style={{ fontSize: 11, color: privacyRisk ? '#fb7185' : matchesPrivacy ? '#a5b4fc' : '#64748b' }}>
+                            {privacyRisk ? '⚠️ Compliance Risk Flagged' : matchesPrivacy ? '✓ GDPR Context Evaluated' : '🔍 No Privacy Terms Found'}
+                          </div>
+                        </div>
+                        <span style={{ color: privacyRisk ? '#fb7185' : matchesPrivacy ? '#34d399' : '#64748b', marginLeft: 'auto', fontWeight: 'bold' }}>
+                          {privacyRisk ? '!' : matchesPrivacy ? '✓' : '?'}
+                        </span>
+                      </div>
+
+                      {/* Indemnification check */}
+                      <div className="security-item" style={{ border: indemnityRisk ? '1px solid rgba(244, 63, 94, 0.2)' : matchesIndemnity ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(255,255,255,0.06)', background: indemnityRisk ? 'rgba(244, 63, 94, 0.02)' : matchesIndemnity ? 'rgba(16, 185, 129, 0.02)' : 'transparent' }}>
+                        <span style={{ fontSize: 16 }}>⚖️</span>
+                        <div>
+                          <div className="security-label" style={{ color: '#fff' }}>Indemnity Boundaries</div>
+                          <div className="security-value" style={{ fontSize: 11, color: indemnityRisk ? '#fb7185' : matchesIndemnity ? '#a5b4fc' : '#64748b' }}>
+                            {indemnityRisk ? '⚠️ Broad Indemnity Risk' : matchesIndemnity ? '✓ Indemnity Clause Checked' : '🔍 No Indemnity Terms Found'}
+                          </div>
+                        </div>
+                        <span style={{ color: indemnityRisk ? '#fb7185' : matchesIndemnity ? '#34d399' : '#64748b', marginLeft: 'auto', fontWeight: 'bold' }}>
+                          {indemnityRisk ? '!' : matchesIndemnity ? '✓' : '?'}
+                        </span>
+                      </div>
+
+                      {/* Liability Cap check */}
+                      <div className="security-item" style={{ border: liabilityRisk ? '1px solid rgba(244, 63, 94, 0.2)' : matchesLiability ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(255,255,255,0.06)', background: liabilityRisk ? 'rgba(244, 63, 94, 0.02)' : matchesLiability ? 'rgba(16, 185, 129, 0.02)' : 'transparent' }}>
+                        <span style={{ fontSize: 16 }}>💸</span>
+                        <div>
+                          <div className="security-label" style={{ color: '#fff' }}>Liability Cap Limit</div>
+                          <div className="security-value" style={{ fontSize: 11, color: liabilityRisk ? '#fb7185' : matchesLiability ? '#a5b4fc' : '#64748b' }}>
+                            {liabilityRisk ? '⚠️ Uncapped Exposure Risk' : matchesLiability ? '✓ Liability Cap Bound' : '🔍 No Liability Cap Found'}
+                          </div>
+                        </div>
+                        <span style={{ color: liabilityRisk ? '#fb7185' : matchesLiability ? '#34d399' : '#64748b', marginLeft: 'auto', fontWeight: 'bold' }}>
+                          {liabilityRisk ? '!' : matchesLiability ? '✓' : '?'}
+                        </span>
+                      </div>
+
+                      {/* Governing Law check */}
+                      <div className="security-item" style={{ border: govLawRisk ? '1px solid rgba(244, 63, 94, 0.2)' : matchesGovLaw ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(255,255,255,0.06)', background: govLawRisk ? 'rgba(244, 63, 94, 0.02)' : matchesGovLaw ? 'rgba(16, 185, 129, 0.02)' : 'transparent' }}>
+                        <span style={{ fontSize: 16 }}>🌍</span>
+                        <div>
+                          <div className="security-label" style={{ color: '#fff' }}>Governing Jurisdiction</div>
+                          <div className="security-value" style={{ fontSize: 11, color: govLawRisk ? '#fb7185' : matchesGovLaw ? '#a5b4fc' : '#64748b' }}>
+                            {govLawRisk ? '⚠️ Jurisdiction Risk Checked' : matchesGovLaw ? '✓ Governing Law Identified' : '🔍 No Jurisdiction Matched'}
+                          </div>
+                        </div>
+                        <span style={{ color: govLawRisk ? '#fb7185' : matchesGovLaw ? '#34d399' : '#64748b', marginLeft: 'auto', fontWeight: 'bold' }}>
+                          {govLawRisk ? '!' : matchesGovLaw ? '✓' : '?'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
