@@ -194,6 +194,7 @@ function App() {
   const [registerPassword, setRegisterPassword] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('EMPLOYEE');
 
@@ -329,6 +330,7 @@ function App() {
       showToast('Please specify a title and select a PDF file');
       return;
     }
+    setIsUploading(true);
     const formData = new FormData();
     formData.append('file', uploadFile);
     formData.append('title', uploadTitle);
@@ -358,6 +360,8 @@ function App() {
       }
     } catch (err) {
       showToast('Network error during file upload');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -754,10 +758,15 @@ function App() {
   };
 
   // Filtered and paginated contract list derived logic
-  const filteredContracts = contracts.filter(c => 
-    c.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    c.originalFilename.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredContracts = contracts.filter(c => {
+    const lastVer = c.versionHistory[c.versionHistory.length - 1];
+    const riskLevel = lastVer?.analysis?.summary.overallRiskLevel || '';
+    return (
+      c.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      c.originalFilename.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      riskLevel.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
 
   const paginatedContracts = filteredContracts.slice(
     (currentPage - 1) * pageSize,
