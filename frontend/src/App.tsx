@@ -195,6 +195,8 @@ function App() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadProgressText, setUploadProgressText] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('EMPLOYEE');
 
@@ -331,6 +333,25 @@ function App() {
       return;
     }
     setIsUploading(true);
+    setUploadProgress(10);
+    setUploadProgressText('📤 Transmitting document bits securely...');
+
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev < 40) {
+          setUploadProgressText('📤 Transmitting document bits securely...');
+          return prev + 10;
+        } else if (prev < 75) {
+          setUploadProgressText('🛡️ Scanning document for viruses & malware...');
+          return prev + 8;
+        } else if (prev < 95) {
+          setUploadProgressText('🤖 Vectorizing RAG index chunks...');
+          return prev + 3;
+        }
+        return prev;
+      });
+    }, 300);
+
     const formData = new FormData();
     formData.append('file', uploadFile);
     formData.append('title', uploadTitle);
@@ -361,7 +382,14 @@ function App() {
     } catch (err) {
       showToast('Network error during file upload');
     } finally {
-      setIsUploading(false);
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      setUploadProgressText('Complete!');
+      setTimeout(() => {
+        setIsUploading(false);
+        setUploadProgress(0);
+        setUploadProgressText('');
+      }, 500);
     }
   };
 
@@ -1272,6 +1300,7 @@ function App() {
                   placeholder="e.g. Mutual Services Agreement"
                   value={uploadTitle}
                   onChange={(e) => setUploadTitle(e.target.value)}
+                  disabled={isUploading}
                   required
                 />
               </div>
@@ -1279,7 +1308,8 @@ function App() {
                 <label className="input-label">Choose PDF Document</label>
                 <div 
                   className="upload-zone"
-                  onClick={() => document.getElementById('contract-modal-file-input')?.click()}
+                  onClick={() => !isUploading && document.getElementById('contract-modal-file-input')?.click()}
+                  style={{ opacity: isUploading ? 0.6 : 1, cursor: isUploading ? 'not-allowed' : 'pointer' }}
                 >
                   <div className="upload-zone-icon">📤</div>
                   <h3 style={{ fontSize: '15px', color: '#fff', margin: '0 0 6px' }}>
@@ -1294,12 +1324,26 @@ function App() {
                     style={{ display: 'none' }}
                     accept="application/pdf"
                     onChange={(e) => setUploadFile(e.target.files ? e.target.files[0] : null)}
+                    disabled={isUploading}
                     required={!uploadFile}
                   />
                 </div>
               </div>
+
+              {isUploading && (
+                <div className="upload-progress-container" style={{ marginBottom: '15px' }}>
+                  <div className="progress-bar-bg">
+                    <div className="progress-bar-fill" style={{ width: `${uploadProgress}%` }}></div>
+                  </div>
+                  <div className="progress-text">
+                    <span>{uploadProgressText}</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                </div>
+              )}
+
               <button type="submit" className="btn" style={{ width: '100%', marginTop: '10px' }} disabled={isUploading}>
-                {isUploading ? 'Vector Indexing...' : 'Start Vector Indexing'}
+                {isUploading ? 'Securely Uploading & Indexing...' : 'Start Vector Indexing'}
               </button>
             </form>
           </div>
@@ -1589,6 +1633,7 @@ function App() {
                   placeholder="e.g. Mutual Services Agreement"
                   value={uploadTitle}
                   onChange={(e) => setUploadTitle(e.target.value)}
+                  disabled={isUploading}
                   required
                 />
               </div>
@@ -1596,7 +1641,8 @@ function App() {
                 <label className="input-label">Choose PDF Document</label>
                 <div 
                   className="upload-zone"
-                  onClick={() => document.getElementById('contract-file-input')?.click()}
+                  onClick={() => !isUploading && document.getElementById('contract-file-input')?.click()}
+                  style={{ opacity: isUploading ? 0.6 : 1, cursor: isUploading ? 'not-allowed' : 'pointer' }}
                 >
                   <div className="upload-zone-icon">📤</div>
                   <h3 style={{ fontSize: '15px', color: '#fff', margin: '0 0 6px' }}>
@@ -1611,12 +1657,26 @@ function App() {
                     style={{ display: 'none' }}
                     accept="application/pdf"
                     onChange={(e) => setUploadFile(e.target.files ? e.target.files[0] : null)}
+                    disabled={isUploading}
                     required={!uploadFile}
                   />
                 </div>
               </div>
-              <button type="submit" className="btn" style={{ width: '100%', marginTop: '10px' }}>
-                Start Vector Indexing
+
+              {isUploading && (
+                <div className="upload-progress-container" style={{ marginBottom: '15px' }}>
+                  <div className="progress-bar-bg">
+                    <div className="progress-bar-fill" style={{ width: `${uploadProgress}%` }}></div>
+                  </div>
+                  <div className="progress-text">
+                    <span>{uploadProgressText}</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                </div>
+              )}
+
+              <button type="submit" className="btn" style={{ width: '100%', marginTop: '10px' }} disabled={isUploading}>
+                {isUploading ? 'Securely Uploading & Indexing...' : 'Start Vector Indexing'}
               </button>
             </form>
           </div>

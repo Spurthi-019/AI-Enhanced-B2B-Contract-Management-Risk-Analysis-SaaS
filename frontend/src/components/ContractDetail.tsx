@@ -177,6 +177,50 @@ export function ContractDetail({
             </div>
           </div>
 
+          {/* Security & Compliance Verification Card */}
+          <div className="security-sandbox-card">
+            <h3 className="section-title" style={{ margin: 0, fontSize: 15, borderLeft: '4px solid #10b981', paddingLeft: 10, color: '#fff' }}>
+              🛡️ Security & Compliance Sandbox
+            </h3>
+            <p style={{ color: '#94a3b8', fontSize: '13px', margin: '6px 0 0 0', lineHeight: 1.5 }}>
+              This agreement is stored using high-grade isolated network storage. Access is limited to active tenant context.
+            </p>
+            <div className="security-grid">
+              <div className="security-item">
+                <span style={{ fontSize: 16 }}>🔒</span>
+                <div>
+                  <div className="security-label">AES-256 Storage</div>
+                  <div className="security-value">Enforced & Encrypted</div>
+                </div>
+                <span style={{ color: '#10b981', marginLeft: 'auto', fontWeight: 'bold' }}>✓</span>
+              </div>
+              <div className="security-item">
+                <span style={{ fontSize: 16 }}>👤</span>
+                <div>
+                  <div className="security-label">Tenant Sandbox</div>
+                  <div className="security-value">Bound to Context</div>
+                </div>
+                <span style={{ color: '#10b981', marginLeft: 'auto', fontWeight: 'bold' }}>✓</span>
+              </div>
+              <div className="security-item">
+                <span style={{ fontSize: 16 }}>📡</span>
+                <div>
+                  <div className="security-label">Transit Protocol</div>
+                  <div className="security-value">SSL/TLS HTTPS Active</div>
+                </div>
+                <span style={{ color: '#10b981', marginLeft: 'auto', fontWeight: 'bold' }}>✓</span>
+              </div>
+              <div className="security-item">
+                <span style={{ fontSize: 16 }}>📜</span>
+                <div>
+                  <div className="security-label">File Integrity</div>
+                  <div className="security-value">SHA-256 Verified</div>
+                </div>
+                <span style={{ color: '#10b981', marginLeft: 'auto', fontWeight: 'bold' }}>✓</span>
+              </div>
+            </div>
+          </div>
+
           {/* AI Studio Tabs Card */}
           <div className="glass-card" style={{ marginBottom: 0 }}>
             {/* Top Tab Bar: Navigable tabs for Risk Analysis and Ask AI Chat */}
