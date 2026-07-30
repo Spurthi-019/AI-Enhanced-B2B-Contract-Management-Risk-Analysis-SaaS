@@ -1253,5 +1253,92 @@ body {
   font-weight: 500;
 }
 
+/* Lifecycle Stepper styles */
+.lifecycle-stepper-card {
+  background: #111827;
+  border: 1px solid #1E293B;
+  border-radius: 16px;
+  padding: 20px 32px;
+  margin-bottom: 0;
+}
+
+.stepper-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  width: 100%;
+}
+
+.stepper-line {
+  position: absolute;
+  top: 18px;
+  left: 0;
+  height: 3px;
+  background: #1e293b;
+  width: 100%;
+  z-index: 1;
+}
+
+.stepper-line-progress {
+  position: absolute;
+  top: 18px;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
+  z-index: 2;
+  transition: width 0.4s ease-out;
+}
+
+.stepper-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 3;
+}
+
+.stepper-bubble {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #0f172a;
+  border: 2px solid #334155;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: #64748b;
+  transition: all 0.4s ease-out;
+  font-weight: bold;
+}
+
+.stepper-step.completed .stepper-bubble {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%);
+  border-color: #8b5cf6;
+  color: #fff;
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
+}
+
+.stepper-step.active .stepper-bubble {
+  background: #6366f1;
+  border-color: #a5b4fc;
+  color: #fff;
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.6);
+}
+
+.stepper-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  margin-top: 8px;
+  transition: color 0.4s ease;
+}
+
+.stepper-step.completed .stepper-label,
+.stepper-step.active .stepper-label {
+  color: #fff;
+}
+
 
 
