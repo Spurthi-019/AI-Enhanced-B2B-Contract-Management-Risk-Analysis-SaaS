@@ -44,6 +44,11 @@ interface ContractVersion {
   updatedAt: string;
 }
 
+interface User {
+  email: string;
+  roles: string[];
+}
+
 interface Contract {
   id: string;
   tenantId: string;
@@ -54,9 +59,11 @@ interface Contract {
   storedFilePath: string;
   createdAt: string;
   expirationDate?: string;
+  approvalStatus?: string;
 }
 
 interface ContractDetailProps {
+  currentUser: User | null;
   selectedContract: Contract;
   selectedVersion: number;
   setSelectedVersion: (version: number) => void;
@@ -80,9 +87,11 @@ interface ContractDetailProps {
   navigate: (to: string) => void;
   token: string | null;
   BACKEND_URL: string;
+  onUpdateContractStatus?: (status: string) => Promise<void>;
 }
 
 export function ContractDetail({
+  currentUser,
   selectedContract,
   selectedVersion,
   setSelectedVersion,
@@ -105,7 +114,8 @@ export function ContractDetail({
   setShowShareModal,
   navigate,
   token,
-  BACKEND_URL
+  BACKEND_URL,
+  onUpdateContractStatus
 }: ContractDetailProps) {
   const activeVersionObj = selectedContract.versionHistory.find(
     v => v.versionNumber === selectedVersion
@@ -129,6 +139,10 @@ export function ContractDetail({
 
   const govLawStatus = compliance?.govLawStatus || 'MISSING';
   const govLawDetails = compliance?.govLawDetails || 'No governing law assessment run yet.';
+
+  const userRoles = currentUser?.roles || [];
+  const canApprove = userRoles.includes('ROLE_ADMIN') || userRoles.includes('ROLE_LEGAL_REVIEWER');
+  const isApproved = selectedContract.approvalStatus === 'APPROVED';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -166,10 +180,41 @@ export function ContractDetail({
             <span className="badge" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#a5b4fc', border: '1px solid rgba(99, 102, 241, 0.2)', padding: '4px 10px', fontSize: '12px', whiteSpace: 'nowrap' }}>
               Workspace: {selectedContract.tenantId.substring(0, 8)}...
             </span>
+
+            {/* Approval Status Badge */}
+            <span className="badge" style={{ 
+              background: selectedContract.approvalStatus === 'APPROVED' ? 'rgba(16, 185, 129, 0.1)' : selectedContract.approvalStatus === 'REJECTED' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)', 
+              color: selectedContract.approvalStatus === 'APPROVED' ? '#34d399' : selectedContract.approvalStatus === 'REJECTED' ? '#f87171' : '#60a5fa', 
+              border: selectedContract.approvalStatus === 'APPROVED' ? '1px solid rgba(16, 185, 129, 0.2)' : selectedContract.approvalStatus === 'REJECTED' ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(59, 130, 246, 0.2)',
+              padding: '4px 10px', 
+              fontSize: '12px', 
+              whiteSpace: 'nowrap'
+            }}>
+              Approval: {selectedContract.approvalStatus || 'PENDING_APPROVAL'}
+            </span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {canApprove && !isApproved && onUpdateContractStatus && (
+            <div style={{ display: 'flex', gap: '8px', borderRight: '1px solid rgba(255,255,255,0.08)', paddingRight: '12px', marginRight: '2px' }}>
+              <button 
+                className="btn" 
+                style={{ padding: '8px 14px', fontSize: '13px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}
+                onClick={() => onUpdateContractStatus('APPROVED')}
+              >
+                ✔️ Approve
+              </button>
+              <button 
+                className="btn btn-secondary" 
+                style={{ padding: '8px 14px', fontSize: '13px', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#f87171' }}
+                onClick={() => onUpdateContractStatus('REJECTED')}
+              >
+                ❌ Request Changes
+              </button>
+            </div>
+          )}
+
           <button 
             className="btn" 
             style={{ padding: '8px 16px', fontSize: '13px', background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)' }}
@@ -574,36 +619,63 @@ export function ContractDetail({
             {/* Comment Feed Container: Vertically scrollable */}
             <div className="sidebar-comments-list" style={{ flexGrow: 1, overflowY: 'auto', marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 12, paddingRight: 5 }}>
               {activeVersionObj?.comments && activeVersionObj.comments.length > 0 ? (
-                activeVersionObj.comments.map(c => (
-                  <div 
-                    className={`comment-bubble ${c.vendorFacing ? 'public-comment' : 'private-comment'}`} 
-                    key={c.id}
-                    style={{ padding: 14, borderRadius: 12, background: c.vendorFacing ? 'rgba(99, 102, 241, 0.03)' : 'rgba(245, 158, 11, 0.03)', border: c.vendorFacing ? '1px solid rgba(99, 102, 241, 0.12)' : '1px solid rgba(245, 158, 11, 0.12)' }}
-                  >
-                    <div className="comment-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <span className="comment-author" style={{ fontWeight: '600', fontSize: 12, color: c.vendorFacing ? '#818cf8' : '#fbbf24' }}>
-                        {c.authorEmail.split('@')[0]}
-                      </span>
-                      <span className="comment-date" style={{ fontSize: 10, color: '#64748b' }}>
-                        {new Date(c.createdAt).toLocaleTimeString()}
-                      </span>
-                    </div>
-                    <div className="comment-body" style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.4, wordBreak: 'break-word' }}>
-                      {c.content}
-                    </div>
-                    <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-start' }}>
-                      {c.vendorFacing ? (
-                        <span className="badge" style={{ fontSize: 9, background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '2px 6px' }}>
-                          🌐 VENDOR FACING
+                activeVersionObj.comments.map(c => {
+                  const emailName = c.authorEmail.split('@')[0];
+                  const initials = emailName.substring(0, 2).toUpperCase();
+                  const authorRole = c.authorEmail.toLowerCase().includes('admin') ? 'Workspace Admin' 
+                                   : c.authorEmail.toLowerCase().includes('legal') || c.authorEmail.toLowerCase().includes('reviewer') ? 'Legal Reviewer'
+                                   : 'Workspace Collaborator';
+                  return (
+                    <div 
+                      className={`comment-bubble ${c.vendorFacing ? 'public-comment' : 'private-comment'}`} 
+                      key={c.id}
+                      style={{ padding: 14, borderRadius: 12, background: c.vendorFacing ? 'rgba(99, 102, 241, 0.03)' : 'rgba(245, 158, 11, 0.03)', border: c.vendorFacing ? '1px solid rgba(99, 102, 241, 0.12)' : '1px solid rgba(245, 158, 11, 0.12)' }}
+                    >
+                      <div style={{ display: 'flex', gap: '10px', marginBottom: '8px', alignItems: 'center' }}>
+                        <div style={{ 
+                          width: '28px', 
+                          height: '28px', 
+                          borderRadius: '50%', 
+                          background: c.vendorFacing ? 'rgba(99, 102, 241, 0.2)' : 'rgba(245, 158, 11, 0.2)', 
+                          color: c.vendorFacing ? '#a5b4fc' : '#fbbf24', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          fontSize: '11px', 
+                          fontWeight: 'bold',
+                          border: c.vendorFacing ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)'
+                        }}>
+                          {initials}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span className="comment-author" style={{ fontWeight: '600', fontSize: '12px', color: '#fff' }}>
+                            {emailName}
+                          </span>
+                          <span style={{ fontSize: '10px', color: '#94a3b8' }}>
+                            {authorRole}
+                          </span>
+                        </div>
+                        <span className="comment-date" style={{ fontSize: '10px', color: '#64748b', marginLeft: 'auto' }}>
+                          {new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
-                      ) : (
-                        <span className="badge" style={{ fontSize: 9, background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)', padding: '2px 6px' }}>
-                          🔒 INTERNAL ONLY
-                        </span>
-                      )}
+                      </div>
+                      <div className="comment-body" style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.4, wordBreak: 'break-word', paddingLeft: '38px' }}>
+                        {c.content}
+                      </div>
+                      <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-start', paddingLeft: '38px' }}>
+                        {c.vendorFacing ? (
+                          <span className="badge" style={{ fontSize: 9, background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '2px 6px' }}>
+                            🌐 VENDOR FACING
+                          </span>
+                        ) : (
+                          <span className="badge" style={{ fontSize: 9, background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)', padding: '2px 6px' }}>
+                            🔒 INTERNAL ONLY
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="empty-state" style={{ padding: '24px 16px' }}>
                   <span className="empty-state-icon" style={{ fontSize: '32px', marginBottom: '10px' }}>💬</span>

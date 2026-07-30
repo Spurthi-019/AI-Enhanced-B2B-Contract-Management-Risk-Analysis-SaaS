@@ -132,6 +132,7 @@ public class ContractController {
         contractDoc.setOriginalFilename(sanitizedFilename);
         contractDoc.setStoredFilePath(targetFilePath.toString());
         contractDoc.setCurrentVersion(1);
+        contractDoc.setApprovalStatus("PENDING_APPROVAL");
         
         ContractVersion version1 = new ContractVersion();
         version1.setVersionNumber(1);
@@ -629,5 +630,34 @@ public class ContractController {
         }
 
         return ResponseEntity.ok(new ChatResponse(answer));
+    }
+
+    @PutMapping("/{id}/status")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'LEGAL_REVIEWER')")
+    public ResponseEntity<ContractDocument> updateContractStatus(
+            @PathVariable("id") String id,
+            @RequestParam("status") String status
+    ) {
+        log.info("Received request to update contract status to {} for contract ID: {}", status, id);
+        String tenantId = TenantContext.getTenantId();
+        if (tenantId == null || tenantId.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing tenant context");
+        }
+
+        // Validate status value
+        if (!List.of("DRAFT", "PENDING_APPROVAL", "APPROVED", "REJECTED").contains(status)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid status value");
+        }
+
+        ContractDocument doc = contractDocumentRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found"));
+
+        if (!tenantId.equals(doc.getTenantId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied to this contract workspace");
+        }
+
+        doc.setApprovalStatus(status);
+        ContractDocument saved = contractDocumentRepository.save(doc);
+        return ResponseEntity.ok(saved);
     }
 }
