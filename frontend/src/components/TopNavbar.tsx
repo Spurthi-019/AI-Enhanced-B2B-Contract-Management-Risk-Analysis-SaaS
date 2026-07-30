@@ -50,27 +50,33 @@ export function TopNavbar({
           className="navbar-search-input"
           placeholder="Search contracts by name, vendor, or keyword..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            if (window.location.pathname !== '/contracts') {
+              navigate('/contracts');
+            }
+          }}
         />
       </div>
 
       {/* Right Side Actions & Profiles */}
       <div className="navbar-actions-section">
         {/* Quick Upload CTA */}
-        {isAdmin && (
-          <button 
-            className="btn" 
-            style={{ padding: '8px 16px', fontSize: '13px', background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)' }}
-            onClick={onOpenUpload}
-          >
-            ➕ Upload
-          </button>
-        )}
+        <button 
+          className="btn" 
+          style={{ padding: '8px 16px', fontSize: '13px', background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)' }}
+          onClick={onOpenUpload}
+        >
+          ➕ Upload
+        </button>
 
         {/* Notification Bell */}
         <button 
           className="navbar-icon-btn" 
-          onClick={() => navigate('/dashboard')}
+          onClick={() => {
+            setSearchQuery('HIGH');
+            navigate('/contracts');
+          }}
           title={`${highRiskCount} High-Risk Alert(s)`}
         >
           🔔
