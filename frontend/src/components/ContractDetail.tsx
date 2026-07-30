@@ -180,6 +180,17 @@ export function ContractDetail({
   const isExpiringSoon = checkIsExpiringSoon();
   const [selectedThreshold, setSelectedThreshold] = React.useState(selectedContract.reminderThresholdDays || 30);
 
+  const chatFormRef = React.useRef<HTMLFormElement>(null);
+
+  const handleQuickPromptClick = (text: string) => {
+    setChatInput(text);
+    setTimeout(() => {
+      if (chatFormRef.current) {
+        chatFormRef.current.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+      }
+    }, 50);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* 1. Re-architected Top Banner & Header Bar */}
@@ -645,14 +656,52 @@ export function ContractDetail({
                 {/* Chat Messages Stream */}
                 <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 15, paddingRight: 5 }}>
                   {(chatMessages[selectedContract.id] || []).length === 0 ? (
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: '#64748b', padding: '0 20px', textAlign: 'center' }}>
-                      <span style={{ fontSize: 32, marginBottom: 10 }}>🤖</span>
-                      <p style={{ margin: 0, fontSize: 14, fontWeight: '600', color: '#e2e8f0' }}>Contract RAG Assistant</p>
-                      <p style={{ margin: 0, marginTop: 6, fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>
-                        Ask queries like: <br />
-                        <i>"What are the payment terms?"</i> or <br />
-                        <i>"What happens if we terminate early?"</i>
-                      </p>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 10px' }}>
+                      <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                        <span style={{ fontSize: 32 }}>🤖</span>
+                        <p style={{ margin: '8px 0 0 0', fontSize: 14, fontWeight: '600', color: '#e2e8f0' }}>AI Contract Assistant</p>
+                        <p style={{ margin: '4px 0 0 0', fontSize: 11, color: '#64748b', lineHeight: 1.4 }}>
+                          Tap a quick-query below to instantly parse the document context using vector RAG similarity search:
+                        </p>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ padding: '10px 14px', textAlign: 'left', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)', color: '#a5b4fc', cursor: 'pointer' }}
+                          onClick={() => handleQuickPromptClick("Can you summarize the main purpose and key terms of this contract?")}
+                        >
+                          <span>📝</span> <span>Summarize Agreement</span>
+                        </button>
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ padding: '10px 14px', textAlign: 'left', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)', color: '#a5b4fc', cursor: 'pointer' }}
+                          onClick={() => handleQuickPromptClick("What is the liability cap limit specified in this agreement?")}
+                        >
+                          <span>💸</span> <span>Liability Cap Limit</span>
+                        </button>
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ padding: '10px 14px', textAlign: 'left', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)', color: '#a5b4fc', cursor: 'pointer' }}
+                          onClick={() => handleQuickPromptClick("What are the data privacy, security, and GDPR compliance terms?")}
+                        >
+                          <span>🛡️</span> <span>GDPR & Privacy Check</span>
+                        </button>
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ padding: '10px 14px', textAlign: 'left', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)', color: '#a5b4fc', cursor: 'pointer' }}
+                          onClick={() => handleQuickPromptClick("What are the indemnification boundaries and responsibilities?")}
+                        >
+                          <span>⚖️</span> <span>Indemnification Boundaries</span>
+                        </button>
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ padding: '10px 14px', textAlign: 'left', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)', color: '#a5b4fc', cursor: 'pointer' }}
+                          onClick={() => handleQuickPromptClick("What is the termination policy and notice period?")}
+                        >
+                          <span>📅</span> <span>Termination notice period</span>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     (chatMessages[selectedContract.id] || []).map((msg, idx) => (
@@ -685,7 +734,7 @@ export function ContractDetail({
                 </div>
 
                 {/* Input Form */}
-                <form onSubmit={handleSendChatMessage} style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 15, display: 'flex', gap: 10 }}>
+                <form ref={chatFormRef} onSubmit={handleSendChatMessage} style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 15, display: 'flex', gap: 10 }}>
                   <input 
                     type="text" 
                     className="input-field" 
