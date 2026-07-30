@@ -774,7 +774,7 @@ function App() {
   // Render Vendor Magic Link portal standalone mode
   if (vendorPortalToken) {
     return (
-      <div className="dashboard-container" style={{ padding: 40, background: '#0b0f19', minHeight: '100vh' }}>
+      <div className="dashboard-container" style={{ padding: 40, background: '#090D16', minHeight: '100vh' }}>
         {toast && <div className="toast-msg">{toast}</div>}
         
         {/* Simplified Header: NO navigation dropdowns or internal menus */}
@@ -981,7 +981,7 @@ function App() {
   // Render Register Page
   if (!token && currentPath === '/register') {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#0b0f19' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#090D16' }}>
         {toast && <div className="toast-msg">{toast}</div>}
         <div className="glass-card" style={{ width: '450px' }}>
           <h1 className="main-title" style={{ textAlign: 'center' }}>🏢 Register Company</h1>
@@ -1047,7 +1047,7 @@ function App() {
   // Render Login Panel
   if (!token) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#0b0f19' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#090D16' }}>
         {toast && <div className="toast-msg">{toast}</div>}
         <div className="glass-card" style={{ width: '450px' }}>
           <h1 className="main-title" style={{ textAlign: 'center' }}>🔑 ContractIQ Portal</h1>
