@@ -144,6 +144,22 @@ export function ContractDetail({
   const canApprove = userRoles.includes('ROLE_ADMIN') || userRoles.includes('ROLE_LEGAL_REVIEWER');
   const isApproved = selectedContract.approvalStatus === 'APPROVED';
 
+  // Derive lifecycle steps
+  const isStep2Completed = activeVersionObj?.analysis ? true : false;
+  const isStep3Completed = activeVersionObj?.comments && activeVersionObj.comments.length > 0 ? true : false;
+  const isStep4Completed = isApproved;
+
+  let stepIndex = 1;
+  if (isStep4Completed) {
+    stepIndex = 4;
+  } else if (isStep3Completed) {
+    stepIndex = 3;
+  } else if (isStep2Completed) {
+    stepIndex = 2;
+  }
+
+  const progressPercent = stepIndex === 1 ? 0 : stepIndex === 2 ? 33 : stepIndex === 3 ? 66 : 100;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* 1. Re-architected Top Banner & Header Bar */}
@@ -229,6 +245,31 @@ export function ContractDetail({
           >
             💬 {showCommentsSidebar ? 'Hide Sidebar' : 'Show Comments & Notes'}
           </button>
+        </div>
+      </div>
+
+      {/* 1.5. Visual Contract Lifecycle Stepper */}
+      <div className="lifecycle-stepper-card">
+        <div className="stepper-container">
+          <div className="stepper-line"></div>
+          <div className="stepper-line-progress" style={{ width: `${progressPercent}%` }}></div>
+          
+          <div className={`stepper-step ${stepIndex >= 1 ? (stepIndex === 1 ? 'active' : 'completed') : ''}`}>
+            <div className="stepper-bubble">📤</div>
+            <div className="stepper-label">Draft Uploaded</div>
+          </div>
+          <div className={`stepper-step ${stepIndex >= 2 ? (stepIndex === 2 ? 'active' : 'completed') : ''}`}>
+            <div className="stepper-bubble">🤖</div>
+            <div className="stepper-label">AI Risk Evaluated</div>
+          </div>
+          <div className={`stepper-step ${stepIndex >= 3 ? (stepIndex === 3 ? 'active' : 'completed') : ''}`}>
+            <div className="stepper-bubble">👥</div>
+            <div className="stepper-label">Teammate Review</div>
+          </div>
+          <div className={`stepper-step ${stepIndex >= 4 ? (stepIndex === 4 ? 'active' : 'completed') : ''}`}>
+            <div className="stepper-bubble">✔️</div>
+            <div className="stepper-label">Approved & Active</div>
+          </div>
         </div>
       </div>
 
