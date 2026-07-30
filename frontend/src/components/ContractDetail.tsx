@@ -88,6 +88,7 @@ interface ContractDetailProps {
   token: string | null;
   BACKEND_URL: string;
   onUpdateContractStatus?: (status: string) => Promise<void>;
+  onUpdateReminderThreshold?: (days: number) => Promise<void>;
 }
 
 export function ContractDetail({
@@ -115,7 +116,8 @@ export function ContractDetail({
   navigate,
   token,
   BACKEND_URL,
-  onUpdateContractStatus
+  onUpdateContractStatus,
+  onUpdateReminderThreshold
 }: ContractDetailProps) {
   const activeVersionObj = selectedContract.versionHistory.find(
     v => v.versionNumber === selectedVersion
@@ -159,6 +161,24 @@ export function ContractDetail({
   }
 
   const progressPercent = stepIndex === 1 ? 0 : stepIndex === 2 ? 33 : stepIndex === 3 ? 66 : 100;
+
+  // Expiration checking
+  const checkIsExpiringSoon = () => {
+    if (!selectedContract.expirationDate) return false;
+    try {
+      const expDate = new Date(selectedContract.expirationDate);
+      if (isNaN(expDate.getTime())) return false;
+      const thresholdDays = selectedContract.reminderThresholdDays || 30;
+      const msDiff = expDate.getTime() - Date.now();
+      const daysDiff = Math.ceil(msDiff / (1000 * 60 * 60 * 24));
+      return daysDiff >= 0 && daysDiff <= thresholdDays;
+    } catch {
+      return false;
+    }
+  };
+
+  const isExpiringSoon = checkIsExpiringSoon();
+  const [selectedThreshold, setSelectedThreshold] = React.useState(selectedContract.reminderThresholdDays || 30);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -510,6 +530,53 @@ export function ContractDetail({
                         <span style={{ color: govLawStatus === 'RISK_FLAGGED' ? '#fb7185' : govLawStatus === 'VERIFIED' ? '#34d399' : '#64748b', marginLeft: 'auto', fontWeight: 'bold' }}>
                           {govLawStatus === 'RISK_FLAGGED' ? '!' : govLawStatus === 'VERIFIED' ? '✓' : '?'}
                         </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ⏰ Expiration & Smart Alerts */}
+                  <div style={{ marginTop: 24, padding: 20, borderRadius: 12, background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <h3 className="input-label" style={{ fontSize: 13, margin: 0, color: '#818cf8', textTransform: 'none', letterSpacing: 'normal', fontWeight: '600' }}>
+                        ⏰ Expiration & Smart Alerts
+                      </h3>
+                      <span className="badge" style={{ 
+                        background: isExpiringSoon ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)', 
+                        color: isExpiringSoon ? '#fbbf24' : '#34d399', 
+                        border: isExpiringSoon ? '1px solid rgba(245, 158, 11, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
+                        padding: '2px 8px',
+                        fontSize: '11px',
+                        fontWeight: '600'
+                      }}>
+                        {isExpiringSoon ? '⚠️ EXPIRING SOON' : '✓ Active'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ color: '#cbd5e1', fontSize: '13px' }}>
+                        📅 Expiration Date: <strong style={{ color: '#fff' }}>{selectedContract.expirationDate || 'Jul 28, 2027'}</strong>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>Notify alert threshold:</span>
+                        <select 
+                          className="input-field"
+                          value={selectedThreshold}
+                          onChange={(e) => setSelectedThreshold(Number(e.target.value))}
+                          style={{ padding: '6px 12px', fontSize: '12px', width: 'auto', height: 'auto', background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}
+                        >
+                          <option value={15}>15 Days before</option>
+                          <option value={30}>30 Days before</option>
+                          <option value={60}>60 Days before</option>
+                          <option value={90}>90 Days before</option>
+                        </select>
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ padding: '6px 14px', fontSize: '12px' }}
+                          onClick={() => onUpdateReminderThreshold?.(selectedThreshold)}
+                        >
+                          Save alert rule
+                        </button>
                       </div>
                     </div>
                   </div>

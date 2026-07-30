@@ -37,6 +37,8 @@ public class ContractDocument {
 
     private String approvalStatus;
 
+    private Integer reminderThresholdDays;
+
     @CreatedDate
     private LocalDateTime createdAt;
 }
