@@ -163,6 +163,7 @@ function App() {
   
   // Pagination & Search states
   const [searchQuery, setSearchQuery] = useState('');
+  const [riskFilter, setRiskFilter] = useState<string>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
 
@@ -837,12 +838,11 @@ function App() {
   // Filtered and paginated contract list derived logic
   const filteredContracts = contracts.filter(c => {
     const lastVer = c.versionHistory[c.versionHistory.length - 1];
-    const riskLevel = lastVer?.analysis?.summary.overallRiskLevel || '';
-    return (
-      c.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      c.originalFilename.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      riskLevel.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const riskLevel = lastVer?.analysis?.summary.overallRiskLevel || 'PENDING';
+    const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          c.originalFilename.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesRisk = riskFilter === 'ALL' || riskLevel.toUpperCase() === riskFilter.toUpperCase();
+    return matchesSearch && matchesRisk;
   });
 
   const paginatedContracts = filteredContracts.slice(
@@ -862,6 +862,20 @@ function App() {
     const lastVer = c.versionHistory[c.versionHistory.length - 1];
     return !lastVer?.analysis;
   }).length;
+
+  const expiringSoonContracts = contracts.filter(doc => {
+    if (!doc.expirationDate) return false;
+    try {
+      const expDate = new Date(doc.expirationDate);
+      if (isNaN(expDate.getTime())) return false;
+      const thresholdDays = doc.reminderThresholdDays || 30;
+      const msDiff = expDate.getTime() - Date.now();
+      const daysDiff = Math.ceil(msDiff / (1000 * 60 * 60 * 24));
+      return daysDiff >= 0 && daysDiff <= thresholdDays;
+    } catch {
+      return false;
+    }
+  });
 
   // Render Vendor Magic Link portal standalone mode
   if (vendorPortalToken) {
@@ -1197,7 +1211,15 @@ function App() {
         currentUser={currentUser}
         tenantName={tenantSettings.companyName || contracts[0]?.tenantId || 'Active Workspace'}
         searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
+        setSearchQuery={(q) => {
+          if (q === 'HIGH') {
+            setRiskFilter('HIGH');
+            setSearchQuery('');
+          } else {
+            setSearchQuery(q);
+          }
+          setCurrentPage(1);
+        }}
         highRiskCount={highRiskContractsCount}
         navigate={navigate}
         handleLogout={handleLogout}
@@ -1471,23 +1493,8 @@ function App() {
       {/* Main Panel Area */}
       <main className="main-content">
         
-        {currentPath === '/dashboard' && (() => {
-          const expiringSoonContracts = contracts.filter(doc => {
-            if (!doc.expirationDate) return false;
-            try {
-              const expDate = new Date(doc.expirationDate);
-              if (isNaN(expDate.getTime())) return false;
-              const thresholdDays = doc.reminderThresholdDays || 30;
-              const msDiff = expDate.getTime() - Date.now();
-              const daysDiff = Math.ceil(msDiff / (1000 * 60 * 60 * 24));
-              return daysDiff >= 0 && daysDiff <= thresholdDays;
-            } catch {
-              return false;
-            }
-          });
-
-          return (
-            <div>
+        {currentPath === '/dashboard' && (
+          <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <div>
                   <h1 className="main-title" style={{ margin: 0 }}>Workspace Analytics</h1>
@@ -1575,14 +1582,14 @@ function App() {
                 ))}
               </div>
             </div>
-          );
-        })()}
+          </div>
+        )}
 
         {/* Tab 2: Contracts Collection (Search & Paginated list & Studio view) */}
         {(currentPath === '/contracts' || currentPath.startsWith('/contracts/')) && (
           <div>
             <h1 className="main-title">Contracts Registry</h1>
-            <p className="sub-title">Search, inspect, and evaluate B2B agreements within active tenant context.</p>
+            <p className="sub-title">Search and manage your organization's contracts.</p>
 
             {selectedContract && currentPath.startsWith('/contracts/') ? (
               <ContractDetail
@@ -1613,18 +1620,49 @@ function App() {
                 onUpdateContractStatus={handleUpdateContractStatus}
                 onUpdateReminderThreshold={handleUpdateReminderThreshold}
               />
+            ) : contracts.length === 0 ? (
+              <div className="empty-state" style={{ padding: '60px 40px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
+                <span className="empty-state-icon" style={{ fontSize: '48px', display: 'block', marginBottom: '15px' }}>📁</span>
+                <h3 className="empty-state-title" style={{ fontSize: '18px', color: '#fff', marginBottom: '8px', fontWeight: '600' }}>No contracts uploaded yet</h3>
+                <p className="empty-state-description" style={{ color: '#94a3b8', fontSize: '14px', maxWidth: '440px', margin: '0 auto 20px', lineHeight: 1.5 }}>
+                  Get started by adding your first B2B agreement. Our AI will automatically index, run legal risk evaluations, and track expiration cycles.
+                </p>
+                <button className="btn" style={{ background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)', padding: '10px 24px', fontSize: '13px' }} onClick={() => setShowUploadModal(true)}>
+                  ➕ Upload your first contract
+                </button>
+              </div>
             ) : (
               <div className="glass-card">
-                {/* Search Bar & Table */}
-                <div className="table-controls">
-                  <input 
-                    type="text" 
-                    className="search-field"
-                    placeholder="Search contract name or files..."
-                    value={searchQuery}
-                    onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                  />
-                  <button className="btn" onClick={() => navigate('/upload')}>
+                {/* Search Bar & Labeled Controls */}
+                <div className="table-controls" style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '220px', flexGrow: 1 }}>
+                    <label className="input-label" style={{ fontSize: '11px', color: '#94a3b8', margin: 0, textTransform: 'none', letterSpacing: 'normal' }}>Search Registry</label>
+                    <input 
+                      type="text" 
+                      className="search-field"
+                      placeholder="Search by title or filename..."
+                      value={searchQuery}
+                      onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                      style={{ width: '100%', margin: 0 }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '160px' }}>
+                    <label className="input-label" style={{ fontSize: '11px', color: '#94a3b8', margin: 0, textTransform: 'none', letterSpacing: 'normal' }}>Risk Level Filter</label>
+                    <select
+                      className="input-field"
+                      value={riskFilter}
+                      onChange={(e) => { setRiskFilter(e.target.value); setCurrentPage(1); }}
+                      style={{ width: '100%', height: 'auto', padding: '10px 14px', margin: 0, background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    >
+                      <option value="ALL">All Risk Levels</option>
+                      <option value="LOW">Low Risk</option>
+                      <option value="MEDIUM">Medium Risk</option>
+                      <option value="HIGH">High Risk</option>
+                    </select>
+                  </div>
+
+                  <button className="btn" style={{ height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0 }} onClick={() => setShowUploadModal(true)}>
                     + Upload Contract
                   </button>
                 </div>
@@ -1633,71 +1671,147 @@ function App() {
                   <div className="empty-state">
                     <span className="empty-state-icon">📂</span>
                     <h3 className="empty-state-title">No Contracts Found</h3>
-                    <p className="empty-state-description">No contracts match your search parameters or your workspace registry is empty. Submit a new document to get started.</p>
+                    <p className="empty-state-description">No contracts match your search parameters or risk filters. Adjust your filters or upload a new contract.</p>
                   </div>
                 ) : (
                   <>
-                    <table className="custom-table">
-                      <thead>
-                        <tr>
-                          <th>Contract Title</th>
-                          <th>Version</th>
-                          <th>Uploaded File</th>
-                          <th>Expiration Date</th>
-                          <th>Risk Assessment</th>
-                          <th>Approval Status</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paginatedContracts.map(doc => {
-                          const lastVer = doc.versionHistory[doc.versionHistory.length - 1];
-                          const riskLevel = lastVer?.analysis?.summary.overallRiskLevel || 'PENDING';
-                          return (
-                            <tr key={doc.id}>
-                              <td style={{ fontWeight: '600' }}>{doc.title}</td>
-                              <td><span className="badge badge-medium">v{doc.currentVersion}</span></td>
-                              <td style={{ color: '#94a3b8', fontSize: 13 }}>📄 {doc.originalFilename}</td>
-                              <td>
-                                {doc.expirationDate ? (
-                                  <span className="badge" style={{ background: 'rgba(167, 139, 250, 0.1)', color: '#a78bfa', border: '1px solid rgba(167, 139, 250, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px' }}>
-                                    📅 {doc.expirationDate}
+                    <div style={{ overflowX: 'auto', width: '100%', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                      <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse', margin: 0 }}>
+                        <thead>
+                          <tr>
+                            <th style={{ verticalAlign: 'middle', padding: '12px 16px' }}>Contract Title</th>
+                            <th style={{ verticalAlign: 'middle', padding: '12px 16px' }}>Version</th>
+                            <th style={{ verticalAlign: 'middle', padding: '12px 16px' }}>Uploaded File</th>
+                            <th style={{ verticalAlign: 'middle', padding: '12px 16px' }}>Expiration Date</th>
+                            <th style={{ verticalAlign: 'middle', padding: '12px 16px' }}>Risk Assessment</th>
+                            <th style={{ verticalAlign: 'middle', padding: '12px 16px' }}>Approval Status</th>
+                            <th style={{ verticalAlign: 'middle', padding: '12px 16px', minWidth: '190px' }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paginatedContracts.map(doc => {
+                            const lastVer = doc.versionHistory[doc.versionHistory.length - 1];
+                            const riskLevel = lastVer?.analysis?.summary.overallRiskLevel || 'PENDING';
+                            
+                            // Expiry logic: alert color accent only if expires <= 30 days
+                            const checkExpiresSoon = (expiryStr: string) => {
+                              if (!expiryStr) return false;
+                              try {
+                                const expDate = new Date(expiryStr);
+                                if (isNaN(expDate.getTime())) return false;
+                                const msDiff = expDate.getTime() - Date.now();
+                                const daysDiff = Math.ceil(msDiff / (1000 * 60 * 60 * 24));
+                                return daysDiff >= 0 && daysDiff <= 30;
+                              } catch {
+                                return false;
+                              }
+                            };
+                            const isUrgent = checkExpiresSoon(doc.expirationDate);
+
+                            const formatSimpleDate = (expiryStr: string) => {
+                              if (!expiryStr) return '—';
+                              const match = expiryStr.match(/(\d{4})-(\d{2})-(\d{2})/);
+                              if (match) {
+                                const [_, year, month, day] = match;
+                                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                                const monthIndex = parseInt(month, 10) - 1;
+                                if (monthIndex >= 0 && monthIndex < 12) {
+                                  return `${months[monthIndex]} ${parseInt(day, 10)}, ${year}`;
+                                }
+                              }
+                              try {
+                                const d = new Date(expiryStr);
+                                if (!isNaN(d.getTime())) {
+                                  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                                  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+                                }
+                              } catch {}
+                              return expiryStr;
+                            };
+
+                            return (
+                              <tr key={doc.id} style={{ height: '60px' }}>
+                                <td style={{ verticalAlign: 'middle', padding: '12px 16px', fontWeight: '600', maxWidth: '240px' }}>
+                                  <div 
+                                    title={doc.title} 
+                                    style={{ 
+                                      display: '-webkit-box', 
+                                      WebkitLineClamp: 2, 
+                                      WebkitBoxOrient: 'vertical', 
+                                      overflow: 'hidden', 
+                                      textOverflow: 'ellipsis', 
+                                      lineHeight: '1.4',
+                                      fontSize: '13px'
+                                    }}
+                                  >
+                                    {doc.title}
+                                  </div>
+                                </td>
+                                <td style={{ verticalAlign: 'middle', padding: '12px 16px' }}>
+                                  <span className="badge" style={{ background: 'rgba(255,255,255,0.06)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                    v{doc.currentVersion}
                                   </span>
-                                ) : (
-                                  <span style={{ color: '#64748b', fontSize: 12 }}>—</span>
-                                )}
-                              </td>
-                              <td>
-                                <span className={`badge badge-${riskLevel.toLowerCase()}`}>
-                                  {riskLevel}
-                                </span>
-                              </td>
-                              <td>
-                                <span className="badge" style={{ 
-                                  background: doc.approvalStatus === 'APPROVED' ? 'rgba(16, 185, 129, 0.1)' : doc.approvalStatus === 'REJECTED' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)', 
-                                  color: doc.approvalStatus === 'APPROVED' ? '#34d399' : doc.approvalStatus === 'REJECTED' ? '#f87171' : '#60a5fa', 
-                                  border: doc.approvalStatus === 'APPROVED' ? '1px solid rgba(16, 185, 129, 0.2)' : doc.approvalStatus === 'REJECTED' ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(59, 130, 246, 0.2)' 
-                                }}>
-                                  {doc.approvalStatus || 'PENDING_APPROVAL'}
-                                </span>
-                              </td>
-                              <td>
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                  <button className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={() => navigate(`/contracts/${doc.id}`)}>
-                                    Inspect Details
-                                  </button>
-                                  {isAdmin && (
-                                    <button className="btn btn-danger" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={() => handleDeleteContract(doc.id)}>
-                                      🗑️ Delete
-                                    </button>
+                                </td>
+                                <td style={{ verticalAlign: 'middle', padding: '12px 16px', color: '#94a3b8', fontSize: 13, maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={doc.originalFilename}>
+                                  📄 {doc.originalFilename}
+                                </td>
+                                <td style={{ verticalAlign: 'middle', padding: '12px 16px' }}>
+                                  {doc.expirationDate ? (
+                                    <span style={{ 
+                                      fontSize: '13px', 
+                                      color: isUrgent ? '#f87171' : '#cbd5e1', 
+                                      fontWeight: isUrgent ? '600' : 'normal',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}>
+                                      📅 {formatSimpleDate(doc.expirationDate)}
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: '#64748b', fontSize: 13 }}>—</span>
                                   )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                                </td>
+                                <td style={{ verticalAlign: 'middle', padding: '12px 16px' }}>
+                                  <span className={`badge badge-${riskLevel.toLowerCase()}`}>
+                                    {riskLevel}
+                                  </span>
+                                </td>
+                                <td style={{ verticalAlign: 'middle', padding: '12px 16px' }}>
+                                  <span className="badge" style={{ 
+                                    background: doc.approvalStatus === 'APPROVED' ? '#10b981' : doc.approvalStatus === 'REJECTED' ? '#ef4444' : '#3b82f6', 
+                                    color: '#ffffff', 
+                                    border: doc.approvalStatus === 'APPROVED' ? '1px solid #059669' : doc.approvalStatus === 'REJECTED' ? '1px solid #dc2626' : '1px solid #2563eb',
+                                    fontWeight: '600'
+                                  }}>
+                                    {doc.approvalStatus || 'PENDING_APPROVAL'}
+                                  </span>
+                                </td>
+                                <td style={{ verticalAlign: 'middle', padding: '12px 16px' }}>
+                                  <div style={{ display: 'flex', gap: '6px' }}>
+                                    <button 
+                                      className="btn btn-secondary" 
+                                      style={{ padding: '6px 12px', fontSize: '11px', whiteSpace: 'nowrap' }} 
+                                      onClick={() => navigate(`/contracts/${doc.id}`)}
+                                    >
+                                      Inspect
+                                    </button>
+                                    {isAdmin && (
+                                      <button 
+                                        className="btn btn-danger" 
+                                        style={{ padding: '6px 12px', fontSize: '11px', whiteSpace: 'nowrap' }} 
+                                        onClick={() => handleDeleteContract(doc.id)}
+                                      >
+                                        Delete
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
 
                     {/* Pagination control details */}
                     <div className="pagination-wrapper">
