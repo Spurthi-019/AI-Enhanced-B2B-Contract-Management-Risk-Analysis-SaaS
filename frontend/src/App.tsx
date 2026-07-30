@@ -44,6 +44,8 @@ interface Contract {
   originalFilename: string;
   storedFilePath: string;
   createdAt: string;
+  expirationDate?: string;
+  approvalStatus?: string;
 }
 
 interface AuditActivity {
@@ -407,7 +409,30 @@ function App() {
         loadContracts(token!);
       }
     } catch (err) {
-      showToast('Error during RAG risk evaluation');
+      console.error("Error triggering analysis:", err);
+    }
+  };
+
+  // Update contract status
+  const handleUpdateContractStatus = async (status: string) => {
+    if (!selectedContract) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/contracts/${selectedContract.id}/status?status=${status}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setContracts(prev => prev.map(c => c.id === updated.id ? updated : c));
+        setSelectedContract(updated);
+        showToast(`Contract approval status updated to ${status}`);
+        addActivity(`Updated contract "${updated.title}" approval status to ${status}.`);
+      } else {
+        const err = await res.text();
+        showToast(`Failed to update status: ${err}`);
+      }
+    } catch (err) {
+      showToast('Network error during status update');
     }
   };
 
@@ -1487,6 +1512,7 @@ function App() {
 
             {selectedContract && currentPath.startsWith('/contracts/') ? (
               <ContractDetail
+                currentUser={currentUser}
                 selectedContract={selectedContract}
                 selectedVersion={selectedVersion}
                 setSelectedVersion={setSelectedVersion}
@@ -1510,6 +1536,7 @@ function App() {
                 navigate={navigate}
                 token={token}
                 BACKEND_URL={BACKEND_URL}
+                onUpdateContractStatus={handleUpdateContractStatus}
               />
             ) : (
               <div className="glass-card">
@@ -1543,6 +1570,7 @@ function App() {
                           <th>Uploaded File</th>
                           <th>Expiration Date</th>
                           <th>Risk Assessment</th>
+                          <th>Approval Status</th>
                           <th>Actions</th>
                         </tr>
                       </thead>
@@ -1567,6 +1595,15 @@ function App() {
                               <td>
                                 <span className={`badge badge-${riskLevel.toLowerCase()}`}>
                                   {riskLevel}
+                                </span>
+                              </td>
+                              <td>
+                                <span className="badge" style={{ 
+                                  background: doc.approvalStatus === 'APPROVED' ? 'rgba(16, 185, 129, 0.1)' : doc.approvalStatus === 'REJECTED' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)', 
+                                  color: doc.approvalStatus === 'APPROVED' ? '#34d399' : doc.approvalStatus === 'REJECTED' ? '#f87171' : '#60a5fa', 
+                                  border: doc.approvalStatus === 'APPROVED' ? '1px solid rgba(16, 185, 129, 0.2)' : doc.approvalStatus === 'REJECTED' ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(59, 130, 246, 0.2)' 
+                                }}>
+                                  {doc.approvalStatus || 'PENDING_APPROVAL'}
                                 </span>
                               </td>
                               <td>

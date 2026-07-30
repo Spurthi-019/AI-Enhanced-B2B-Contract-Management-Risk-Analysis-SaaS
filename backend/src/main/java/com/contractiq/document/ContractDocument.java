@@ -35,6 +35,8 @@ public class ContractDocument {
 
     private String expirationDate;
 
+    private String approvalStatus;
+
     @CreatedDate
     private LocalDateTime createdAt;
 }
