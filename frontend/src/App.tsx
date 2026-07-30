@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import { LandingPage } from './components/LandingPage';
 import { ContractDetail } from './components/ContractDetail';
+import { TopNavbar } from './components/TopNavbar';
 
 interface Comment {
   id: string;
@@ -192,6 +193,7 @@ function App() {
   const [registerEmail, setRegisterEmail] = useState(localStorage.getItem('quickEmail') || '');
   const [registerPassword, setRegisterPassword] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('EMPLOYEE');
 
@@ -1099,9 +1101,28 @@ function App() {
     v => v.versionNumber === selectedVersion
   );
 
+  const handleLogout = () => {
+    setToken(null);
+    setCurrentUser(null);
+    setContracts([]);
+    setTenantSettings({ companyName: '', domain: '', aiModel: 'llama3', riskSensitivity: 'MEDIUM', magicLinkExpiryDays: 7, webhookUrl: '' });
+    navigate('/');
+  };
+
   return (
-    <div className="app-layout">
-      {toast && <div className="toast-msg">{toast}</div>}
+    <div className="app-container-with-navbar">
+      <TopNavbar
+        currentUser={currentUser}
+        tenantName={tenantSettings.companyName || contracts[0]?.tenantId || 'Active Workspace'}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        highRiskCount={highRiskContractsCount}
+        navigate={navigate}
+        handleLogout={handleLogout}
+        onOpenUpload={() => setShowUploadModal(true)}
+      />
+      <div className="app-layout">
+        {toast && <div className="toast-msg">{toast}</div>}
 
       {/* Share Modal */}
       {showShareModal && (
@@ -1217,6 +1238,63 @@ function App() {
 
               <button type="submit" className="btn" style={{ width: '100%', padding: '12px' }}>
                 Send Workspace Invitation
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Contract Modal */}
+      {showUploadModal && (
+        <div className="modal-backdrop">
+          <div className="modal-content glass-card" style={{ maxWidth: '500px', width: '90%' }}>
+            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 15, marginBottom: 20 }}>
+              <h2 className="section-title" style={{ margin: 0, borderLeft: 'none', paddingLeft: 0 }}>📤 Upload Contract</h2>
+              <button 
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18 }}
+                onClick={() => { setShowUploadModal(false); setUploadFile(null); setUploadTitle(''); }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <form onSubmit={async (e) => { e.preventDefault(); await handleUpload(e); setShowUploadModal(false); }}>
+              <div className="input-group">
+                <label className="input-label">Contract Title</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  placeholder="e.g. Mutual Services Agreement"
+                  value={uploadTitle}
+                  onChange={(e) => setUploadTitle(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Choose PDF Document</label>
+                <div 
+                  className="upload-zone"
+                  onClick={() => document.getElementById('contract-modal-file-input')?.click()}
+                >
+                  <div className="upload-zone-icon">📤</div>
+                  <h3 style={{ fontSize: '15px', color: '#fff', margin: '0 0 6px' }}>
+                    {uploadFile ? uploadFile.name : 'Select contract PDF file'}
+                  </h3>
+                  <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
+                    {uploadFile ? `${(uploadFile.size / 1024 / 1024).toFixed(2)} MB` : 'Click to browse files or drop a PDF copy here'}
+                  </p>
+                  <input 
+                    id="contract-modal-file-input"
+                    type="file" 
+                    style={{ display: 'none' }}
+                    accept="application/pdf"
+                    onChange={(e) => setUploadFile(e.target.files ? e.target.files[0] : null)}
+                    required={!uploadFile}
+                  />
+                </div>
+              </div>
+              <button type="submit" className="btn" style={{ width: '100%', marginTop: '10px' }} disabled={isUploading}>
+                {isUploading ? 'Vector Indexing...' : 'Start Vector Indexing'}
               </button>
             </form>
           </div>
@@ -1830,6 +1908,7 @@ function App() {
         )}
 
       </main>
+    </div>
     </div>
   );
 }
