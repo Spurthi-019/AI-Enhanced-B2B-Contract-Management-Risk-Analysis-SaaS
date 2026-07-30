@@ -3,7 +3,7 @@ body {
   margin: 0;
   padding: 0;
   font-family: 'Outfit', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  background-color: #0b0f19;
+  background-color: #090D16;
   color: #f1f5f9;
   min-height: 100vh;
 }
@@ -25,8 +25,8 @@ body {
 /* Sidebar Styling */
 .sidebar {
   width: 280px;
-  background: #0f172a;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0F172A;
+  border-right: 1px solid #1E293B;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -94,7 +94,7 @@ body {
 .nav-item.active {
   background: rgba(99, 102, 241, 0.15);
   color: #a5b4fc;
-  border-left: 3px solid #6366f1;
+  border-left: 3px solid #8B5CF6;
 }
 
 .sidebar-footer {
@@ -133,10 +133,10 @@ body {
 
 /* Glassmorphism Card Style */
 .glass-card {
-  background: rgba(17, 25, 40, 0.65);
+  background: #111827;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid #1E293B;
   border-radius: 16px;
   padding: 24px;
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
@@ -269,7 +269,7 @@ body {
 }
 
 .btn {
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -287,7 +287,7 @@ body {
 
 .btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.4);
 }
 
 .btn:active {
@@ -844,8 +844,8 @@ body {
 .skeleton-card {
   padding: 32px;
   border-radius: 16px;
-  background: rgba(17, 25, 40, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #111827;
+  border: 1px solid #1E293B;
 }
 @keyframes loading-shimmer {
   0% { background-position: 200% 0; }
@@ -854,7 +854,7 @@ body {
 
 /* Premium Enhancements: Drag & Drop styled Upload Zone */
 .upload-zone {
-  border: 2px dashed rgba(99, 102, 241, 0.3);
+  border: 2px dashed #334155;
   background: rgba(99, 102, 241, 0.01);
   border-radius: 16px;
   padding: 48px 32px;
@@ -909,7 +909,7 @@ body {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #0b0f19;
+  background: #090D16;
   border: 4px solid #6366f1;
   box-shadow: 0 0 10px rgba(99, 102, 241, 0.8);
   z-index: 2;
@@ -935,8 +935,8 @@ body {
 .metric-card-premium {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(30, 41, 59, 0.3) 0%, rgba(15, 23, 42, 0.5) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: #111827;
+  border: 1px solid #1E293B;
   border-radius: 16px;
   padding: 24px;
   display: flex;
