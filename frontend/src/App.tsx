@@ -296,8 +296,10 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     setToken(null);
+    setCurrentUser(null);
     setContracts([]);
     setSelectedContract(null);
+    setTenantSettings({ companyName: '', domain: '', aiModel: 'llama3', riskSensitivity: 'MEDIUM', magicLinkExpiryDays: 7, webhookUrl: '' });
     showToast('Logged out of ContractIQ session.');
     addActivity('User logged out of active workspace.');
     navigate('/');
@@ -1101,13 +1103,6 @@ function App() {
     v => v.versionNumber === selectedVersion
   );
 
-  const handleLogout = () => {
-    setToken(null);
-    setCurrentUser(null);
-    setContracts([]);
-    setTenantSettings({ companyName: '', domain: '', aiModel: 'llama3', riskSensitivity: 'MEDIUM', magicLinkExpiryDays: 7, webhookUrl: '' });
-    navigate('/');
-  };
 
   return (
     <div className="app-container-with-navbar">
