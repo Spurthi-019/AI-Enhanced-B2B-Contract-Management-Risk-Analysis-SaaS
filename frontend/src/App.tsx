@@ -46,6 +46,7 @@ interface Contract {
   createdAt: string;
   expirationDate?: string;
   approvalStatus?: string;
+  reminderThresholdDays?: number;
 }
 
 interface AuditActivity {
@@ -433,6 +434,29 @@ function App() {
       }
     } catch (err) {
       showToast('Network error during status update');
+    }
+  };
+
+  // Update reminder alert threshold days
+  const handleUpdateReminderThreshold = async (days: number) => {
+    if (!selectedContract) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/contracts/${selectedContract.id}/reminders?days=${days}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setContracts(prev => prev.map(c => c.id === updated.id ? updated : c));
+        setSelectedContract(updated);
+        showToast(`Smart expiration threshold set to ${days} days`);
+        addActivity(`Set reminder alert threshold for "${updated.title}" to ${days} days.`);
+      } else {
+        const err = await res.text();
+        showToast(`Failed to update reminder threshold: ${err}`);
+      }
+    } catch (err) {
+      showToast('Network error during reminder threshold update');
     }
   };
 
@@ -1447,20 +1471,70 @@ function App() {
       {/* Main Panel Area */}
       <main className="main-content">
         
-        {/* Tab 1: Dashboard Analytics */}
-        {currentPath === '/dashboard' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div>
-                <h1 className="main-title" style={{ margin: 0 }}>Workspace Analytics</h1>
-                <p className="sub-title" style={{ margin: 0, marginTop: 4 }}>Corporate contract management, compliance thresholds, and legal audit indexes.</p>
+        {currentPath === '/dashboard' && (() => {
+          const expiringSoonContracts = contracts.filter(doc => {
+            if (!doc.expirationDate) return false;
+            try {
+              const expDate = new Date(doc.expirationDate);
+              if (isNaN(expDate.getTime())) return false;
+              const thresholdDays = doc.reminderThresholdDays || 30;
+              const msDiff = expDate.getTime() - Date.now();
+              const daysDiff = Math.ceil(msDiff / (1000 * 60 * 60 * 24));
+              return daysDiff >= 0 && daysDiff <= thresholdDays;
+            } catch {
+              return false;
+            }
+          });
+
+          return (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <div>
+                  <h1 className="main-title" style={{ margin: 0 }}>Workspace Analytics</h1>
+                  <p className="sub-title" style={{ margin: 0, marginTop: 4 }}>Corporate contract management, compliance thresholds, and legal audit indexes.</p>
+                </div>
+                {isAdmin && (
+                  <button className="btn" onClick={() => setShowInviteModal(true)}>
+                    ➕ Invite Team Members
+                  </button>
+                )}
               </div>
-              {isAdmin && (
-                <button className="btn" onClick={() => setShowInviteModal(true)}>
-                  ➕ Invite Team Members
-                </button>
-              )}
-            </div>
+
+              {/* Expiration Alert Banner */}
+              <div className="glass-card" style={{ marginBottom: 20, border: expiringSoonContracts.length > 0 ? '1px solid rgba(245, 158, 11, 0.2)' : '1px solid rgba(16, 185, 129, 0.15)', background: expiringSoonContracts.length > 0 ? 'rgba(245, 158, 11, 0.01)' : 'rgba(16, 185, 129, 0.01)' }}>
+                <h3 className="section-title" style={{ margin: 0, fontSize: 14, borderLeft: expiringSoonContracts.length > 0 ? '4px solid #f59e0b' : '4px solid #10b981', paddingLeft: 10, color: '#fff' }}>
+                  ⏰ Smart Expiration Monitor
+                </h3>
+                {expiringSoonContracts.length > 0 ? (
+                  <div style={{ marginTop: 12 }}>
+                    <p style={{ color: '#fbbf24', fontSize: 13, margin: '0 0 10px 0' }}>
+                      ⚠️ <strong>Attention:</strong> The following B2B agreements are approaching their configured expiration alert thresholds:
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {expiringSoonContracts.map(doc => (
+                        <div key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
+                          <div>
+                            <span style={{ fontWeight: '600', fontSize: 13, color: '#fff' }}>{doc.title}</span>
+                            <span style={{ fontSize: 11, color: '#64748b', marginLeft: 10 }}>({doc.originalFilename})</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '2px 8px', fontSize: 11 }}>
+                              📅 Expiry: {doc.expirationDate}
+                            </span>
+                            <button className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: 11 }} onClick={() => navigate(`/contracts/${doc.id}`)}>
+                              Inspect
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p style={{ color: '#34d399', fontSize: 12, margin: '10px 0 0 0' }}>
+                    ✓ All workspace agreements are actively within safe expiration alert thresholds.
+                  </p>
+                )}
+              </div>
 
             <div className="metrics-grid">
               <div className="metric-card-premium info">
@@ -1501,8 +1575,8 @@ function App() {
                 ))}
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Tab 2: Contracts Collection (Search & Paginated list & Studio view) */}
         {(currentPath === '/contracts' || currentPath.startsWith('/contracts/')) && (
@@ -1537,6 +1611,7 @@ function App() {
                 token={token}
                 BACKEND_URL={BACKEND_URL}
                 onUpdateContractStatus={handleUpdateContractStatus}
+                onUpdateReminderThreshold={handleUpdateReminderThreshold}
               />
             ) : (
               <div className="glass-card">

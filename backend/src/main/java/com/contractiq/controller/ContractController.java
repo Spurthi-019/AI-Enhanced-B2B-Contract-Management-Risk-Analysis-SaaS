@@ -133,6 +133,7 @@ public class ContractController {
         contractDoc.setStoredFilePath(targetFilePath.toString());
         contractDoc.setCurrentVersion(1);
         contractDoc.setApprovalStatus("PENDING_APPROVAL");
+        contractDoc.setReminderThresholdDays(30);
         
         ContractVersion version1 = new ContractVersion();
         version1.setVersionNumber(1);
@@ -657,6 +658,33 @@ public class ContractController {
         }
 
         doc.setApprovalStatus(status);
+        ContractDocument saved = contractDocumentRepository.save(doc);
+        return ResponseEntity.ok(saved);
+    }
+
+    @PutMapping("/{id}/reminders")
+    public ResponseEntity<ContractDocument> updateReminderThreshold(
+            @PathVariable("id") String id,
+            @RequestParam("days") Integer days
+    ) {
+        log.info("Received request to update reminder threshold to {} days for contract ID: {}", days, id);
+        String tenantId = TenantContext.getTenantId();
+        if (tenantId == null || tenantId.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing tenant context");
+        }
+
+        if (days == null || days <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid alert threshold days");
+        }
+
+        ContractDocument doc = contractDocumentRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found"));
+
+        if (!tenantId.equals(doc.getTenantId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied to this contract workspace");
+        }
+
+        doc.setReminderThresholdDays(days);
         ContractDocument saved = contractDocumentRepository.save(doc);
         return ResponseEntity.ok(saved);
     }
