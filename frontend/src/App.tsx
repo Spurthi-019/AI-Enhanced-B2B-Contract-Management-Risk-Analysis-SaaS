@@ -93,6 +93,24 @@ function App() {
 
   const [workspaceUsers, setWorkspaceUsers] = useState<any[]>([]);
 
+  // Tenant Settings states
+  const [tenantSettings, setTenantSettings] = useState<{
+    companyName: string;
+    domain: string;
+    aiModel: string;
+    riskSensitivity: string;
+    magicLinkExpiryDays: number;
+    webhookUrl: string;
+  }>({
+    companyName: '',
+    domain: '',
+    aiModel: 'llama3',
+    riskSensitivity: 'MEDIUM',
+    magicLinkExpiryDays: 7,
+    webhookUrl: ''
+  });
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
   const loadWorkspaceUsers = async (authToken: string) => {
     try {
       const res = await fetch(`${BACKEND_URL}/api/v1/tenants/users`, {
@@ -107,9 +125,26 @@ function App() {
     }
   };
 
+  const loadTenantSettings = async (authToken: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/tenants/settings`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      if (res.ok) {
+        const settings = await res.json();
+        setTenantSettings(settings);
+      }
+    } catch (err) {
+      console.error("Error loading tenant settings:", err);
+    }
+  };
+
   useEffect(() => {
-    if (token && isAdmin) {
-      loadWorkspaceUsers(token);
+    if (token) {
+      loadTenantSettings(token);
+      if (isAdmin) {
+        loadWorkspaceUsers(token);
+      }
     }
   }, [token, isAdmin]);
 
@@ -480,6 +515,34 @@ function App() {
       }
     } catch (err) {
       showToast('Failed to generate magic link sharing invitation');
+    }
+  };
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSettings(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/tenants/settings`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(tenantSettings)
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setTenantSettings(updated);
+        showToast('Workspace settings saved successfully!');
+        addActivity('Workspace settings updated.');
+      } else {
+        const err = await res.text();
+        showToast(`Failed to save settings: ${err || 'Forbidden'}`);
+      }
+    } catch (err) {
+      showToast('Network error saving workspace settings');
+    } finally {
+      setIsSavingSettings(false);
     }
   };
 
@@ -1164,7 +1227,7 @@ function App() {
         <div className="sidebar-header">
           <h1 className="sidebar-brand">ContractIQ</h1>
           <div className="sidebar-tenant-badge">
-            Tenant: {contracts[0]?.tenantId || 'Active Workspace'}
+            Workspace: {tenantSettings.companyName || contracts[0]?.tenantId || 'Active Workspace'}
           </div>
 
           <nav className="sidebar-nav">
@@ -1207,10 +1270,10 @@ function App() {
                   📜 Audit Logs
                 </button>
                 <button 
-                  className={`nav-item ${currentPath === '/settings' ? 'active' : ''}`}
+                  className={`nav-item ${currentPath === '/settings' ? 'active' : ''}`} 
                   onClick={() => navigate('/settings')}
                 >
-                  ⚙️ Workspace Settings
+                  ⚙️ Workspace Settings {isAdmin ? <span className="badge" style={{ marginLeft: '4px', background: '#6366F1', color: '#fff', padding: '2px 6px', borderRadius: '4px' }}>Admin Only</span> : <span className="badge" style={{ marginLeft: '4px', background: '#94A3B8', color: '#000', padding: '2px 6px', borderRadius: '4px' }}>View Policy</span>}
                 </button>
               </>
             )}
@@ -1232,7 +1295,6 @@ function App() {
       <main className="main-content">
         
         {/* Tab 1: Dashboard Analytics */}
-        {/* Tab 1: Dashboard Analytics */}
         {currentPath === '/dashboard' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -1248,35 +1310,40 @@ function App() {
             </div>
 
             <div className="metrics-grid">
-              <div className="metric-card">
+              <div className="metric-card-premium info">
                 <span className="metric-label">Total Contracts</span>
                 <span className="metric-value">{totalContractsCount}</span>
-                <span className="metric-trend">✓ Uploaded successfully</span>
+                <span className="metric-trend" style={{ color: '#818cf8' }}>✓ Uploaded successfully</span>
               </div>
-              <div className="metric-card">
+              <div className="metric-card-premium high-risk">
                 <span className="metric-label">High-Risk Contracts</span>
                 <span className="metric-value">{highRiskContractsCount}</span>
-                <span className="metric-trend negative">{highRiskContractsCount > 0 ? `${highRiskContractsCount} flagged item(s)` : 'None detected'}</span>
+                <span className="metric-trend negative" style={{ color: '#fb7185' }}>{highRiskContractsCount > 0 ? `${highRiskContractsCount} flagged item(s)` : 'None detected'}</span>
               </div>
-              <div className="metric-card">
+              <div className="metric-card-premium warning">
                 <span className="metric-label">Pending Reviews</span>
                 <span className="metric-value">{pendingReviewsCount}</span>
-                <span className="metric-trend">{pendingReviewsCount > 0 ? 'Requires AI RAG run' : 'Completed'}</span>
+                <span className="metric-trend" style={{ color: '#fcd34d' }}>{pendingReviewsCount > 0 ? 'Requires AI RAG run' : 'Completed'}</span>
               </div>
-              <div className="metric-card">
+              <div className="metric-card-premium success">
                 <span className="metric-label">Shared Portals</span>
                 <span className="metric-value">{generatedMagicLink ? 1 : 0}</span>
-                <span className="metric-trend">✓ Vendor links active</span>
+                <span className="metric-trend" style={{ color: '#34d399' }}>✓ Vendor links active</span>
               </div>
             </div>
 
             <div className="glass-card">
-              <h2 className="section-title">Audit Trail & Recent Activity</h2>
-              <div className="activity-list">
+              <h2 className="section-title">Audit Trail & Workspace Log</h2>
+              <div className="timeline-wrapper" style={{ marginTop: 24 }}>
                 {activities.map(act => (
-                  <div className="activity-item" key={act.id}>
-                    <span className="activity-desc">{act.description}</span>
-                    <span className="activity-time">{act.timestamp}</span>
+                  <div className="timeline-event" key={act.id}>
+                    <div className="timeline-node"></div>
+                    <div className="timeline-content-card">
+                      <span className="activity-desc" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>⚡</span> {act.description}
+                      </span>
+                      <span className="activity-time">{act.timestamp}</span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1386,7 +1453,26 @@ function App() {
                     </div>
 
                     {rightPanelTab === 'risk' ? (
-                      activeVersionObj?.analysis ? (
+                      isAnalyzing ? (
+                        <div className="glass-card skeleton-card">
+                          <div className="skeleton-loader">
+                            <div className="skeleton-line title"></div>
+                            <div style={{ display: 'flex', gap: '16px', margin: '12px 0' }}>
+                              <div className="skeleton-line" style={{ height: '80px', width: '80px', borderRadius: '50%' }}></div>
+                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div className="skeleton-line"></div>
+                                <div className="skeleton-line medium"></div>
+                              </div>
+                            </div>
+                            <div className="skeleton-line"></div>
+                            <div className="skeleton-line"></div>
+                            <div className="skeleton-line short"></div>
+                          </div>
+                          <p style={{ textAlign: 'center', marginTop: '16px', color: '#818cf8', fontSize: '13px', fontWeight: '500' }}>
+                            <span className="spinner"></span> Running vector index queries & prompt completion...
+                          </p>
+                        </div>
+                      ) : activeVersionObj?.analysis ? (
                         <div className="glass-card">
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                             <h2 className="section-title" style={{ margin: 0 }}>AI Risk Analysis</h2>
@@ -1396,15 +1482,8 @@ function App() {
                               className="btn btn-secondary" 
                               style={{ padding: '8px 16px', fontSize: '13px' }} 
                               onClick={() => triggerStudioAnalysis(selectedContract.id)}
-                              disabled={isAnalyzing}
                             >
-                              {isAnalyzing ? (
-                                <>
-                                  <span className="spinner"></span> Analyzing...
-                                </>
-                              ) : (
-                                '🔄 Re-Run AI Analysis'
-                              )}
+                              🔄 Re-Run AI Analysis
                             </button>
                           </div>
 
@@ -1497,15 +1576,8 @@ function App() {
                             className="btn" 
                             style={{ padding: '12px 24px' }}
                             onClick={() => triggerStudioAnalysis(selectedContract.id)}
-                            disabled={isAnalyzing}
                           >
-                            {isAnalyzing ? (
-                              <>
-                                <span className="spinner"></span> Generating AI Review...
-                              </>
-                            ) : (
-                              'Analyze Contract'
-                            )}
+                            Analyze Contract
                           </button>
                         </div>
                       )
@@ -1635,9 +1707,11 @@ function App() {
                             </div>
                           ))
                         ) : (
-                          <p style={{ color: '#64748b', textAlign: 'center', padding: '30px 0', fontSize: 13 }}>
-                            No comments recorded on version {selectedVersion}.
-                          </p>
+                          <div className="empty-state" style={{ padding: '24px 16px' }}>
+                            <span className="empty-state-icon" style={{ fontSize: '32px', marginBottom: '10px' }}>💬</span>
+                            <h4 className="empty-state-title" style={{ fontSize: '15px', marginBottom: '4px' }}>No Notes Yet</h4>
+                            <p className="empty-state-description" style={{ fontSize: '12px' }}>Be the first to record a note or post a comment on version {selectedVersion}.</p>
+                          </div>
                         )}
                       </div>
 
@@ -1687,8 +1761,10 @@ function App() {
                 </div>
 
                 {filteredContracts.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748b' }}>
-                    <p>No contracts match your search parameters.</p>
+                  <div className="empty-state">
+                    <span className="empty-state-icon">📂</span>
+                    <h3 className="empty-state-title">No Contracts Found</h3>
+                    <p className="empty-state-description">No contracts match your search parameters or your workspace registry is empty. Submit a new document to get started.</p>
                   </div>
                 ) : (
                   <>
@@ -1795,13 +1871,26 @@ function App() {
               </div>
               <div className="input-group">
                 <label className="input-label">Choose PDF Document</label>
-                <input 
-                  type="file" 
-                  className="input-file" 
-                  accept="application/pdf"
-                  onChange={(e) => setUploadFile(e.target.files ? e.target.files[0] : null)}
-                  required
-                />
+                <div 
+                  className="upload-zone"
+                  onClick={() => document.getElementById('contract-file-input')?.click()}
+                >
+                  <div className="upload-zone-icon">📤</div>
+                  <h3 style={{ fontSize: '15px', color: '#fff', margin: '0 0 6px' }}>
+                    {uploadFile ? uploadFile.name : 'Select contract PDF file'}
+                  </h3>
+                  <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
+                    {uploadFile ? `${(uploadFile.size / 1024 / 1024).toFixed(2)} MB` : 'Click to browse files or drop a PDF copy here'}
+                  </p>
+                  <input 
+                    id="contract-file-input"
+                    type="file" 
+                    style={{ display: 'none' }}
+                    accept="application/pdf"
+                    onChange={(e) => setUploadFile(e.target.files ? e.target.files[0] : null)}
+                    required={!uploadFile}
+                  />
+                </div>
               </div>
               <button type="submit" className="btn" style={{ width: '100%', marginTop: '10px' }}>
                 Start Vector Indexing
@@ -1811,28 +1900,151 @@ function App() {
         )}
 
         {/* Tab 4: System Settings */}
-        {currentPath === '/settings' && isAdmin && (
-          <div className="glass-card" style={{ maxWidth: '600px', margin: '0 auto' }}>
-            <h1 className="main-title">Tenant Settings</h1>
-            <p className="sub-title">System keys, environment configs, and legal AI model options.</p>
-            
-            <div className="input-group">
-              <span className="input-label">SaaS Tenant Model</span>
-              <div style={{ color: '#a5b4fc', fontWeight: 'bold' }}>Default Multi-Tenant Isolated Space</div>
+        {currentPath === '/settings' && (
+          isAdmin ? (
+            <div className="glass-card" style={{ maxWidth: '600px', margin: '0 auto' }}>
+              <h1 className="main-title">⚙️ Workspace Settings</h1>
+              <p className="sub-title">Configure legal AI inference models, risk sensitivities, expiration defaults, and integrations.</p>
+              
+              <form onSubmit={handleSaveSettings}>
+                <div className="input-group">
+                  <label className="input-label">Company / Tenant Name</label>
+                  <input 
+                    type="text" 
+                    className="input-field" 
+                    value={tenantSettings.companyName} 
+                    onChange={(e) => setTenantSettings(prev => ({ ...prev, companyName: e.target.value }))}
+                    required 
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label">Company Domain</label>
+                  <input 
+                    type="text" 
+                    className="input-field" 
+                    placeholder="e.g. company.com"
+                    value={tenantSettings.domain || ''} 
+                    onChange={(e) => setTenantSettings(prev => ({ ...prev, domain: e.target.value }))}
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label">AI Review Model</label>
+                  <select 
+                    className="input-field"
+                    value={tenantSettings.aiModel}
+                    onChange={(e) => setTenantSettings(prev => ({ ...prev, aiModel: e.target.value }))}
+                    style={{ width: '100%', background: 'rgba(30, 41, 59, 0.7)' }}
+                  >
+                    <option value="llama3">Llama 3 (Local Ollama Node)</option>
+                    <option value="mistral">Mistral 7B (Local / Cloud)</option>
+                    <option value="gpt-4o">GPT-4o (OpenAI Cloud API)</option>
+                    <option value="claude-3.5">Claude 3.5 Sonnet (Anthropic API)</option>
+                  </select>
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label" style={{ marginBottom: 8 }}>Risk Sensitivity Threshold</label>
+                  <div style={{ display: 'flex', gap: 20, marginTop: 5 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                      <input 
+                        type="radio" 
+                        name="riskSensitivity" 
+                        value="HIGH" 
+                        checked={tenantSettings.riskSensitivity === 'HIGH'} 
+                        onChange={() => setTenantSettings(prev => ({ ...prev, riskSensitivity: 'HIGH' }))}
+                      />
+                      Conservative / High Sensitivity
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                      <input 
+                        type="radio" 
+                        name="riskSensitivity" 
+                        value="MEDIUM" 
+                        checked={tenantSettings.riskSensitivity === 'MEDIUM'} 
+                        onChange={() => setTenantSettings(prev => ({ ...prev, riskSensitivity: 'MEDIUM' }))}
+                      />
+                      Balanced
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                      <input 
+                        type="radio" 
+                        name="riskSensitivity" 
+                        value="LOW" 
+                        checked={tenantSettings.riskSensitivity === 'LOW'} 
+                        onChange={() => setTenantSettings(prev => ({ ...prev, riskSensitivity: 'LOW' }))}
+                      />
+                      Lenient
+                    </label>
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label">Vendor Magic Link Expiration (Days)</label>
+                  <input 
+                    type="number" 
+                    className="input-field" 
+                    min="1" 
+                    max="90"
+                    value={tenantSettings.magicLinkExpiryDays} 
+                    onChange={(e) => setTenantSettings(prev => ({ ...prev, magicLinkExpiryDays: parseInt(e.target.value) || 7 }))}
+                    required 
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label">Teams / Slack Notification Webhook URL (Optional)</label>
+                  <input 
+                    type="url" 
+                    className="input-field" 
+                    placeholder="https://hooks.slack.com/services/..."
+                    value={tenantSettings.webhookUrl || ''} 
+                    onChange={(e) => setTenantSettings(prev => ({ ...prev, webhookUrl: e.target.value }))}
+                  />
+                </div>
+
+                <button 
+                  type="submit" 
+                  className="btn" 
+                  style={{ width: '100%', marginTop: 15 }} 
+                  disabled={isSavingSettings}
+                >
+                  {isSavingSettings ? 'Saving Settings...' : 'Save Workspace Settings'}
+                </button>
+              </form>
             </div>
-            <div className="input-group">
-              <span className="input-label">AI Inference Engine</span>
-              <div>Ollama ChatModel (local node)</div>
+          ) : (
+            <div className="glass-card" style={{ maxWidth: '600px', margin: '0 auto' }}>
+              <h1 className="main-title">⚙️ Workspace Settings (Read‑Only)</h1>
+              <p className="sub-title">Company policy and environment summary.</p>
+              <div className="input-group">
+                <label className="input-label">Company / Tenant Name</label>
+                <input type="text" className="input-field" value={tenantSettings.companyName} disabled />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Company Domain</label>
+                <input type="text" className="input-field" value={tenantSettings.domain || ''} disabled />
+              </div>
+              <div className="input-group">
+                <label className="input-label">AI Review Model</label>
+                <input type="text" className="input-field" value={tenantSettings.aiModel} disabled />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Risk Sensitivity Threshold</label>
+                <input type="text" className="input-field" value={tenantSettings.riskSensitivity} disabled />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Vendor Magic Link Expiration (Days)</label>
+                <input type="number" className="input-field" value={tenantSettings.magicLinkExpiryDays} disabled />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Teams / Slack Notification Webhook URL (Optional)</label>
+                <input type="url" className="input-field" value={tenantSettings.webhookUrl || ''} disabled />
+              </div>
+              <div className="notice-badge" style={{ marginTop: '10px', color: '#f43f5e' }}>🔒 Workspace settings can only be modified by a Workspace Admin.</div>
             </div>
-            <div className="input-group">
-              <span className="input-label">Vector Database</span>
-              <div>PostgreSQL 18 (Native Host Service)</div>
-            </div>
-            <div className="input-group">
-              <span className="input-label">Audit Log Level</span>
-              <div style={{ color: '#34d399' }}>Active / Verbose logging</div>
-            </div>
-          </div>
+          )
         )}
 
         {/* Tab 5: User Management */}
