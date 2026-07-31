@@ -1038,7 +1038,7 @@ function App() {
                     placeholder="Type a public message for the review team..."
                     value={commentContent}
                     onChange={(e) => setCommentContent(e.target.value)}
-                    style={{ width: '100%', boxSizing: 'border-box', height: 80, padding: 10, fontSize: 13, marginBottom: 12, resize: 'none', background: '#FFFFFF', border: '1px solid rgba(203, 213, 225, 0.8)', color: '#0F172A' }}
+                    style={{ width: '100%', boxSizing: 'border-box', height: 80, padding: 10, fontSize: 13, marginBottom: 12, resize: 'none', background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
                     required
                   />
                   <button type="submit" className="btn" style={{ width: '100%', padding: '10px' }}>
@@ -1508,17 +1508,17 @@ function App() {
               </div>
 
               {/* Dashboard Hero Card */}
-              <div className="glass-card" style={{ marginBottom: 25, background: 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)', position: 'relative', overflow: 'hidden' }}>
+              <div className="glass-card" style={{ marginBottom: 25, background: 'var(--bg-card)', position: 'relative', overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #06b6d4, #3b82f6)' }}></div>
-                <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0F172A', margin: '0 0 8px 0' }}>Welcome back!</h2>
-                <p style={{ color: '#475569', fontSize: '14px', lineHeight: '1.6', margin: 0 }}>
+                <h2 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 8px 0' }}>Welcome back!</h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.6', margin: 0 }}>
                   Gain instant visibility into contract risks, upcoming expiration dates, and vendor negotiations.
                 </p>
               </div>
 
               {/* Expiration Alert Banner */}
               <div className="glass-card" style={{ marginBottom: 20, border: expiringSoonContracts.length > 0 ? '1px solid rgba(245, 158, 11, 0.2)' : '1px solid rgba(16, 185, 129, 0.15)', background: expiringSoonContracts.length > 0 ? 'rgba(245, 158, 11, 0.01)' : 'rgba(16, 185, 129, 0.01)' }}>
-                <h3 className="section-title" style={{ margin: 0, fontSize: 14, borderLeft: expiringSoonContracts.length > 0 ? '4px solid #f59e0b' : '4px solid #10b981', paddingLeft: 10, color: '#0F172A' }}>
+                <h3 className="section-title" style={{ margin: 0, fontSize: 14, borderLeft: expiringSoonContracts.length > 0 ? '4px solid #f59e0b' : '4px solid #10b981', paddingLeft: 10, color: 'var(--text-primary)' }}>
                   ⏰ Smart Expiration Monitor
                 </h3>
                 {expiringSoonContracts.length > 0 ? (
@@ -1528,10 +1528,10 @@ function App() {
                     </p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {expiringSoonContracts.map(doc => (
-                        <div key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.02)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.04)' }}>
+                        <div key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-canvas)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-color)' }}>
                           <div>
-                            <span style={{ fontWeight: '600', fontSize: 13, color: '#0F172A' }}>{doc.title}</span>
-                            <span style={{ fontSize: 11, color: '#64748b', marginLeft: 10 }}>({doc.originalFilename})</span>
+                            <span style={{ fontWeight: '600', fontSize: 13, color: 'var(--text-primary)' }}>{doc.title}</span>
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 10 }}>({doc.originalFilename})</span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                             <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '2px 8px', fontSize: 11 }}>
@@ -2120,28 +2120,28 @@ function App() {
             <div className="metrics-grid" style={{ marginBottom: 30 }}>
               <div className="metric-card" style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(99, 102, 241, 0.05) 100%)', border: '1px solid rgba(59, 130, 246, 0.15)' }}>
                 <span className="metric-label" style={{ color: '#2563eb' }}>Active Plan Tier</span>
-                <span className="metric-value" style={{ fontSize: 24, marginTop: 5, color: '#0F172A' }}>Enterprise Pro</span>
+                <span className="metric-value" style={{ fontSize: 24, marginTop: 5, color: 'var(--text-primary)' }}>Enterprise Pro</span>
                 <span className="metric-trend" style={{ color: '#3b82f6' }}>✓ Auto-renews Aug 24</span>
               </div>
               <div className="metric-card">
                 <span className="metric-label">Monthly Charge</span>
-                <span className="metric-value" style={{ fontSize: 24, marginTop: 5, color: '#0F172A' }}>$499.00</span>
+                <span className="metric-value" style={{ fontSize: 24, marginTop: 5, color: 'var(--text-primary)' }}>$499.00</span>
                 <span className="metric-trend">Invoice sent to company admin</span>
               </div>
               <div className="metric-card">
                 <span className="metric-label">Workspace User Seats</span>
-                <span className="metric-value" style={{ fontSize: 24, marginTop: 5, color: '#0F172A' }}>{workspaceUsers.length} seats</span>
+                <span className="metric-value" style={{ fontSize: 24, marginTop: 5, color: 'var(--text-primary)' }}>{workspaceUsers.length} seats</span>
                 <span className="metric-trend">✓ Uncapped seats active</span>
               </div>
             </div>
 
-            <div style={{ background: '#FFFFFF', border: '1px solid rgba(226, 232, 240, 0.8)', borderRadius: 12, padding: 20, marginBottom: 30 }}>
-              <h3 className="input-label" style={{ fontSize: 14, color: '#0F172A', marginBottom: 12 }}>Usage Metrics Quotas</h3>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, padding: 20, marginBottom: 30 }}>
+              <h3 className="input-label" style={{ fontSize: 14, color: 'var(--text-primary)', marginBottom: 12 }}>Usage Metrics Quotas</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5 }}>
-                    <span style={{ color: '#475569' }}>RAG Vector Index Storage</span>
-                    <span style={{ color: '#64748B' }}>348 MB / 10 GB (3.48%)</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>RAG Vector Index Storage</span>
+                    <span style={{ color: 'var(--text-muted)' }}>348 MB / 10 GB (3.48%)</span>
                   </div>
                   <div style={{ background: 'rgba(0,0,0,0.05)', height: 6, borderRadius: 3 }}>
                     <div style={{ background: '#3b82f6', width: '3.48%', height: '100%', borderRadius: 3 }}></div>
@@ -2149,8 +2149,8 @@ function App() {
                 </div>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5 }}>
-                    <span style={{ color: '#475569' }}>AI Prompt Completions Limit</span>
-                    <span style={{ color: '#64748B' }}>872 / 10,000 queries</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>AI Prompt Completions Limit</span>
+                    <span style={{ color: 'var(--text-muted)' }}>872 / 10,000 queries</span>
                   </div>
                   <div style={{ background: 'rgba(0,0,0,0.05)', height: 6, borderRadius: 3 }}>
                     <div style={{ background: '#10b981', width: '8.72%', height: '100%', borderRadius: 3 }}></div>

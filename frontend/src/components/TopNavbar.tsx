@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTheme } from '../ThemeContext';
 
 interface User {
   email: string;
@@ -27,6 +28,7 @@ export function TopNavbar({
   onOpenUpload
 }: TopNavbarProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   const userEmail = currentUser?.email || 'user@contractiq.com';
   const displayEmail = userEmail.split('@')[0];
@@ -89,6 +91,25 @@ export function TopNavbar({
         <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.08)', color: '#2563eb', border: '1px solid rgba(59, 130, 246, 0.15)', padding: '6px 12px', fontSize: '12px', fontWeight: '500' }}>
           🏢 {tenantName || 'Workspace'}
         </span>
+
+        {/* Theme Toggle Button */}
+        <button 
+          onClick={toggleTheme}
+          className="btn btn-secondary" 
+          style={{ 
+            padding: '8px 12px', 
+            fontSize: '13px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px', 
+            transition: 'all 0.3s ease',
+            height: '36px',
+            boxSizing: 'border-box'
+          }}
+          title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+        >
+          {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
+        </button>
 
         {/* Profile Dropdown Container */}
         <div className="profile-dropdown-container">
