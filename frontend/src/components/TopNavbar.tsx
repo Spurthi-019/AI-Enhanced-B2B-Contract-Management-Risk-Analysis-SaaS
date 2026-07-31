@@ -86,7 +86,7 @@ export function TopNavbar({
         </button>
 
         {/* Workspace Pill */}
-        <span className="badge" style={{ background: 'rgba(99, 102, 241, 0.12)', color: '#a5b4fc', border: '1px solid rgba(99, 102, 241, 0.25)', padding: '6px 12px', fontSize: '12px', fontWeight: '500' }}>
+        <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.08)', color: '#2563eb', border: '1px solid rgba(59, 130, 246, 0.15)', padding: '6px 12px', fontSize: '12px', fontWeight: '500' }}>
           🏢 {tenantName || 'Workspace'}
         </span>
 
@@ -102,8 +102,8 @@ export function TopNavbar({
 
           {dropdownOpen && (
             <div className="profile-dropdown-menu">
-              <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: 4 }}>
-                <span className="badge" style={{ background: 'rgba(139, 92, 246, 0.15)', color: '#c084fc', border: '1px solid rgba(139, 92, 246, 0.25)', display: 'block', textAlign: 'center', fontSize: 10 }}>
+              <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(226, 232, 240, 0.8)', marginBottom: 4 }}>
+                <span className="badge" style={{ background: 'rgba(139, 92, 246, 0.08)', color: '#6d28d9', border: '1px solid rgba(139, 92, 246, 0.15)', display: 'block', textAlign: 'center', fontSize: 10 }}>
                   Role: {displayRole}
                 </span>
               </div>
