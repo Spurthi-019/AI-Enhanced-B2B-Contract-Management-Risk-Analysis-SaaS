@@ -950,19 +950,19 @@ function App() {
                               transform="rotate(-90 60 60)"
                               style={{ transition: 'stroke-dashoffset 0.8s ease-in-out' }}
                             />
-                            <text x="60" y="65" textAnchor="middle" fill="#fff" fontSize="22" fontWeight="bold">
+                            <text x="60" y="65" textAnchor="middle" fill="#0F172A" fontSize="22" fontWeight="bold">
                               {riskScore}
                             </text>
                           </svg>
                           <div className="risk-gauge-label">
-                            <span className="risk-gauge-title">Risk Index</span>
+                            <span className="risk-gauge-title" style={{ color: '#64748B' }}>Risk Index</span>
                             <span style={{ color: riskColor, fontWeight: 'bold', fontSize: 13 }}>{riskLevel} RISK</span>
                           </div>
                         </div>
                         
                         <div className="risk-gauge-summary">
                           <h3 className="input-label" style={{ fontSize: 13, marginBottom: 6 }}>Executive Summary</h3>
-                          <p style={{ fontSize: 13, color: '#cbd5e1', margin: 0, lineHeight: 1.5 }}>
+                          <p style={{ fontSize: 13, color: '#334155', margin: 0, lineHeight: 1.5 }}>
                             {vendorPortalData.analysis.summary.summaryText}
                           </p>
                         </div>
@@ -1038,7 +1038,7 @@ function App() {
                     placeholder="Type a public message for the review team..."
                     value={commentContent}
                     onChange={(e) => setCommentContent(e.target.value)}
-                    style={{ width: '100%', boxSizing: 'border-box', height: 80, padding: 10, fontSize: 13, marginBottom: 12, resize: 'none', background: 'rgba(30,41,59,0.5)', color: '#fff' }}
+                    style={{ width: '100%', boxSizing: 'border-box', height: 80, padding: 10, fontSize: 13, marginBottom: 12, resize: 'none', background: '#FFFFFF', border: '1px solid rgba(203, 213, 225, 0.8)', color: '#0F172A' }}
                     required
                   />
                   <button type="submit" className="btn" style={{ width: '100%', padding: '10px' }}>
@@ -1383,7 +1383,7 @@ function App() {
                   style={{ opacity: isUploading ? 0.6 : 1, cursor: isUploading ? 'not-allowed' : 'pointer' }}
                 >
                   <div className="upload-zone-icon">📤</div>
-                  <h3 style={{ fontSize: '15px', color: '#fff', margin: '0 0 6px' }}>
+                  <h3 style={{ fontSize: '15px', color: '#0F172A', margin: '0 0 6px' }}>
                     {uploadFile ? uploadFile.name : 'Select contract PDF file'}
                   </h3>
                   <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
@@ -1507,25 +1507,34 @@ function App() {
                 )}
               </div>
 
+              {/* Dashboard Hero Card */}
+              <div className="glass-card" style={{ marginBottom: 25, background: 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)', position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #06b6d4, #3b82f6)' }}></div>
+                <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0F172A', margin: '0 0 8px 0' }}>Welcome back!</h2>
+                <p style={{ color: '#475569', fontSize: '14px', lineHeight: '1.6', margin: 0 }}>
+                  Gain instant visibility into contract risks, upcoming expiration dates, and vendor negotiations.
+                </p>
+              </div>
+
               {/* Expiration Alert Banner */}
               <div className="glass-card" style={{ marginBottom: 20, border: expiringSoonContracts.length > 0 ? '1px solid rgba(245, 158, 11, 0.2)' : '1px solid rgba(16, 185, 129, 0.15)', background: expiringSoonContracts.length > 0 ? 'rgba(245, 158, 11, 0.01)' : 'rgba(16, 185, 129, 0.01)' }}>
-                <h3 className="section-title" style={{ margin: 0, fontSize: 14, borderLeft: expiringSoonContracts.length > 0 ? '4px solid #f59e0b' : '4px solid #10b981', paddingLeft: 10, color: '#fff' }}>
+                <h3 className="section-title" style={{ margin: 0, fontSize: 14, borderLeft: expiringSoonContracts.length > 0 ? '4px solid #f59e0b' : '4px solid #10b981', paddingLeft: 10, color: '#0F172A' }}>
                   ⏰ Smart Expiration Monitor
                 </h3>
                 {expiringSoonContracts.length > 0 ? (
                   <div style={{ marginTop: 12 }}>
-                    <p style={{ color: '#fbbf24', fontSize: 13, margin: '0 0 10px 0' }}>
+                    <p style={{ color: '#b45309', fontSize: 13, margin: '0 0 10px 0' }}>
                       ⚠️ <strong>Attention:</strong> The following B2B agreements are approaching their configured expiration alert thresholds:
                     </p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {expiringSoonContracts.map(doc => (
-                        <div key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
+                        <div key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.02)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(0,0,0,0.04)' }}>
                           <div>
-                            <span style={{ fontWeight: '600', fontSize: 13, color: '#fff' }}>{doc.title}</span>
+                            <span style={{ fontWeight: '600', fontSize: 13, color: '#0F172A' }}>{doc.title}</span>
                             <span style={{ fontSize: 11, color: '#64748b', marginLeft: 10 }}>({doc.originalFilename})</span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '2px 8px', fontSize: 11 }}>
+                            <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '2px 8px', fontSize: 11 }}>
                               📅 Expiry: {doc.expirationDate}
                             </span>
                             <button className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: 11 }} onClick={() => navigate(`/contracts/${doc.id}`)}>
@@ -1537,32 +1546,32 @@ function App() {
                     </div>
                   </div>
                 ) : (
-                  <p style={{ color: '#34d399', fontSize: 12, margin: '10px 0 0 0' }}>
+                  <p style={{ color: '#10b981', fontSize: 12, margin: '10px 0 0 0' }}>
                     ✓ All workspace agreements are actively within safe expiration alert thresholds.
                   </p>
                 )}
               </div>
 
             <div className="metrics-grid">
-              <div className="metric-card-premium info">
-                <span className="metric-label">Total Contracts</span>
-                <span className="metric-value">{totalContractsCount}</span>
-                <span className="metric-trend" style={{ color: '#818cf8' }}>✓ Uploaded successfully</span>
+              <div className="metric-card action-card-upload" onClick={() => setShowUploadModal(true)}>
+                <span className="metric-label" style={{ color: '#0369a1', fontWeight: 'bold' }}>📤 Upload Contract</span>
+                <span className="metric-value" style={{ color: '#0284c7', fontSize: '24px' }}>+ Add PDF</span>
+                <span className="metric-trend" style={{ color: '#0284c7' }}>Index & parse agreements</span>
               </div>
-              <div className="metric-card-premium high-risk">
-                <span className="metric-label">High-Risk Contracts</span>
-                <span className="metric-value">{highRiskContractsCount}</span>
-                <span className="metric-trend negative" style={{ color: '#fb7185' }}>{highRiskContractsCount > 0 ? `${highRiskContractsCount} flagged item(s)` : 'None detected'}</span>
+              <div className="metric-card action-card-flags" onClick={() => { setRiskFilter('HIGH'); navigate('/contracts'); }}>
+                <span className="metric-label" style={{ color: '#b45309', fontWeight: 'bold' }}>⚠️ High Risk Flags</span>
+                <span className="metric-value" style={{ color: '#d97706', fontSize: '24px' }}>{highRiskContractsCount}</span>
+                <span className="metric-trend" style={{ color: '#d97706' }}>{highRiskContractsCount > 0 ? 'Requires legal review' : 'Zero items flagged'}</span>
               </div>
-              <div className="metric-card-premium warning">
-                <span className="metric-label">Pending Reviews</span>
-                <span className="metric-value">{pendingReviewsCount}</span>
-                <span className="metric-trend" style={{ color: '#fcd34d' }}>{pendingReviewsCount > 0 ? 'Requires AI RAG run' : 'Completed'}</span>
+              <div className="metric-card action-card-analytics" onClick={() => navigate('/dashboard')}>
+                <span className="metric-label" style={{ color: '#047857', fontWeight: 'bold' }}>📊 Risk Analytics</span>
+                <span className="metric-value" style={{ color: '#059669', fontSize: '24px' }}>{totalContractsCount}</span>
+                <span className="metric-trend" style={{ color: '#059669' }}>Active B2B portfolio</span>
               </div>
-              <div className="metric-card-premium success">
-                <span className="metric-label">Shared Portals</span>
-                <span className="metric-value">{generatedMagicLink ? 1 : 0}</span>
-                <span className="metric-trend" style={{ color: '#34d399' }}>✓ Vendor links active</span>
+              <div className="metric-card action-card-ai" onClick={() => navigate('/contracts')}>
+                <span className="metric-label" style={{ color: '#6d28d9', fontWeight: 'bold' }}>🤖 Ask AI Studio</span>
+                <span className="metric-value" style={{ color: '#7c3aed', fontSize: '24px' }}>Interactive RAG</span>
+                <span className="metric-trend" style={{ color: '#7c3aed' }}>Chat with vector index</span>
               </div>
             </div>
 
@@ -1871,7 +1880,7 @@ function App() {
                   style={{ opacity: isUploading ? 0.6 : 1, cursor: isUploading ? 'not-allowed' : 'pointer' }}
                 >
                   <div className="upload-zone-icon">📤</div>
-                  <h3 style={{ fontSize: '15px', color: '#fff', margin: '0 0 6px' }}>
+                  <h3 style={{ fontSize: '15px', color: '#0F172A', margin: '0 0 6px' }}>
                     {uploadFile ? uploadFile.name : 'Select contract PDF file'}
                   </h3>
                   <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
@@ -2109,59 +2118,59 @@ function App() {
             <p className="sub-title" style={{ marginBottom: 25 }}>Configure subscription tiers, usage quotas, and payment receipts.</p>
 
             <div className="metrics-grid" style={{ marginBottom: 30 }}>
-              <div className="metric-card" style={{ background: 'linear-gradient(135deg, rgba(167, 139, 250, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)', border: '1px solid rgba(167, 139, 250, 0.15)' }}>
-                <span className="metric-label" style={{ color: '#c084fc' }}>Active Plan Tier</span>
-                <span className="metric-value" style={{ fontSize: 24, marginTop: 5 }}>Enterprise Pro</span>
-                <span className="metric-trend" style={{ color: '#a78bfa' }}>✓ Auto-renews Aug 24</span>
+              <div className="metric-card" style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(99, 102, 241, 0.05) 100%)', border: '1px solid rgba(59, 130, 246, 0.15)' }}>
+                <span className="metric-label" style={{ color: '#2563eb' }}>Active Plan Tier</span>
+                <span className="metric-value" style={{ fontSize: 24, marginTop: 5, color: '#0F172A' }}>Enterprise Pro</span>
+                <span className="metric-trend" style={{ color: '#3b82f6' }}>✓ Auto-renews Aug 24</span>
               </div>
               <div className="metric-card">
                 <span className="metric-label">Monthly Charge</span>
-                <span className="metric-value" style={{ fontSize: 24, marginTop: 5 }}>$499.00</span>
+                <span className="metric-value" style={{ fontSize: 24, marginTop: 5, color: '#0F172A' }}>$499.00</span>
                 <span className="metric-trend">Invoice sent to company admin</span>
               </div>
               <div className="metric-card">
                 <span className="metric-label">Workspace User Seats</span>
-                <span className="metric-value" style={{ fontSize: 24, marginTop: 5 }}>{workspaceUsers.length} seats</span>
+                <span className="metric-value" style={{ fontSize: 24, marginTop: 5, color: '#0F172A' }}>{workspaceUsers.length} seats</span>
                 <span className="metric-trend">✓ Uncapped seats active</span>
               </div>
             </div>
 
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, padding: 20, marginBottom: 30 }}>
-              <h3 className="input-label" style={{ fontSize: 14, color: '#fff', marginBottom: 12 }}>Usage Metrics Quotas</h3>
+            <div style={{ background: '#FFFFFF', border: '1px solid rgba(226, 232, 240, 0.8)', borderRadius: 12, padding: 20, marginBottom: 30 }}>
+              <h3 className="input-label" style={{ fontSize: 14, color: '#0F172A', marginBottom: 12 }}>Usage Metrics Quotas</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5 }}>
-                    <span style={{ color: '#cbd5e1' }}>RAG Vector Index Storage</span>
-                    <span style={{ color: '#94a3b8' }}>348 MB / 10 GB (3.48%)</span>
+                    <span style={{ color: '#475569' }}>RAG Vector Index Storage</span>
+                    <span style={{ color: '#64748B' }}>348 MB / 10 GB (3.48%)</span>
                   </div>
-                  <div style={{ background: 'rgba(255,255,255,0.05)', height: 6, borderRadius: 3 }}>
-                    <div style={{ background: '#a78bfa', width: '3.48%', height: '100%', borderRadius: 3 }}></div>
+                  <div style={{ background: 'rgba(0,0,0,0.05)', height: 6, borderRadius: 3 }}>
+                    <div style={{ background: '#3b82f6', width: '3.48%', height: '100%', borderRadius: 3 }}></div>
                   </div>
                 </div>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5 }}>
-                    <span style={{ color: '#cbd5e1' }}>AI Prompt Completions Limit</span>
-                    <span style={{ color: '#94a3b8' }}>872 / 10,000 queries</span>
+                    <span style={{ color: '#475569' }}>AI Prompt Completions Limit</span>
+                    <span style={{ color: '#64748B' }}>872 / 10,000 queries</span>
                   </div>
-                  <div style={{ background: 'rgba(255,255,255,0.05)', height: 6, borderRadius: 3 }}>
-                    <div style={{ background: '#34d399', width: '8.72%', height: '100%', borderRadius: 3 }}></div>
+                  <div style={{ background: 'rgba(0,0,0,0.05)', height: 6, borderRadius: 3 }}>
+                    <div style={{ background: '#10b981', width: '8.72%', height: '100%', borderRadius: 3 }}></div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <h3 className="input-label" style={{ fontSize: 14, color: '#fff', marginBottom: 15 }}>Available Upgrades</h3>
+            <h3 className="input-label" style={{ fontSize: 14, color: '#0F172A', marginBottom: 15 }}>Available Upgrades</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
               <div className="metric-card" style={{ textAlign: 'center', opacity: 0.6 }}>
                 <span className="metric-label" style={{ fontSize: 14, fontWeight: 'bold' }}>Legal Pro Plan</span>
-                <span className="metric-value" style={{ fontSize: 22, margin: '10px 0' }}>$149/mo</span>
+                <span className="metric-value" style={{ fontSize: 22, margin: '10px 0', color: '#0F172A' }}>$149/mo</span>
                 <span className="metric-trend" style={{ fontSize: 11 }}>Limited to 50 contracts & 2,000 queries</span>
               </div>
-              <div className="metric-card" style={{ textAlign: 'center', border: '2px solid #a78bfa', background: 'rgba(167, 139, 250, 0.02)' }}>
+              <div className="metric-card" style={{ textAlign: 'center', border: '2px solid #3b82f6', background: 'rgba(59, 130, 246, 0.02)' }}>
                 <div className="badge badge-high" style={{ alignSelf: 'center', marginBottom: 5 }}>Active Plan</div>
-                <span className="metric-label" style={{ fontSize: 14, fontWeight: 'bold', color: '#fff' }}>Enterprise Pro Plan</span>
-                <span className="metric-value" style={{ fontSize: 22, margin: '10px 0' }}>$499/mo</span>
-                <span className="metric-trend" style={{ fontSize: 11, color: '#a78bfa' }}>Unlimited contracts, vector storage & SLA support</span>
+                <span className="metric-label" style={{ fontSize: 14, fontWeight: 'bold', color: '#0F172A' }}>Enterprise Pro Plan</span>
+                <span className="metric-value" style={{ fontSize: 22, margin: '10px 0', color: '#0F172A' }}>$499/mo</span>
+                <span className="metric-trend" style={{ fontSize: 11, color: '#3b82f6' }}>Unlimited contracts, vector storage & SLA support</span>
               </div>
             </div>
           </div>

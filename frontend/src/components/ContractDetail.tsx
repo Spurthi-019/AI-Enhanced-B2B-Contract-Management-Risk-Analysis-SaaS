@@ -321,12 +321,12 @@ export function ContractDetail({
             </div>
           </div>
 
-          {/* Security & Compliance Verification Card */}
+           {/* Security & Compliance Verification Card */}
           <div className="security-sandbox-card">
-            <h3 className="section-title" style={{ margin: 0, fontSize: 15, borderLeft: '4px solid #10b981', paddingLeft: 10, color: '#fff' }}>
+            <h3 className="section-title" style={{ margin: 0, fontSize: 15, borderLeft: '4px solid #10b981', paddingLeft: 10, color: '#0F172A' }}>
               🛡️ Security & Compliance Sandbox
             </h3>
-            <p style={{ color: '#94a3b8', fontSize: '13px', margin: '6px 0 0 0', lineHeight: 1.5 }}>
+            <p style={{ color: '#64748B', fontSize: '13px', margin: '6px 0 0 0', lineHeight: 1.5 }}>
               This agreement is stored using high-grade isolated network storage. Access is limited to active tenant context.
             </p>
             <div className="security-grid">
@@ -450,20 +450,20 @@ export function ContractDetail({
                             transform="rotate(-90 60 60)"
                             style={{ transition: 'stroke-dashoffset 0.8s ease-in-out' }}
                           />
-                          <text x="60" y="65" textAnchor="middle" fill="#fff" fontSize="22" fontWeight="bold">
+                          <text x="60" y="65" textAnchor="middle" fill="#0F172A" fontSize="22" fontWeight="bold">
                             {riskScore}
                           </text>
                         </svg>
                         <div className="risk-gauge-label" style={{ marginTop: '8px' }}>
-                          <span className="risk-gauge-title">Risk Index</span>
+                          <span className="risk-gauge-title" style={{ color: '#64748B' }}>Risk Index</span>
                           <span style={{ color: riskColor, fontWeight: 'bold', fontSize: 13 }}>{riskLevel} RISK</span>
                         </div>
                       </div>
                     </div>
                     {/* Right: Executive Summary paragraph text with clean typography */}
                     <div className="risk-gauge-summary">
-                      <h3 className="input-label" style={{ fontSize: '14px', marginBottom: '8px', color: '#818cf8', fontWeight: '600' }}>Executive Summary</h3>
-                      <p style={{ fontSize: '14px', color: '#cbd5e1', margin: 0, lineHeight: 1.6 }}>
+                      <h3 className="input-label" style={{ fontSize: '14px', marginBottom: '8px', color: '#3b82f6', fontWeight: '600' }}>Executive Summary</h3>
+                      <p style={{ fontSize: '14px', color: '#334155', margin: 0, lineHeight: 1.6 }}>
                         {activeVersionObj.analysis.summary.summaryText}
                       </p>
                     </div>
@@ -477,13 +477,13 @@ export function ContractDetail({
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
                       {/* GDPR check */}
                       <div className="security-item" style={{ 
-                        border: gdprStatus === 'RISK_FLAGGED' ? '1px solid rgba(244, 63, 94, 0.2)' : gdprStatus === 'VERIFIED' ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(255,255,255,0.06)', 
+                        border: gdprStatus === 'RISK_FLAGGED' ? '1px solid rgba(244, 63, 94, 0.2)' : gdprStatus === 'VERIFIED' ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(0,0,0,0.06)', 
                         background: gdprStatus === 'RISK_FLAGGED' ? 'rgba(244, 63, 94, 0.02)' : gdprStatus === 'VERIFIED' ? 'rgba(16, 185, 129, 0.02)' : 'transparent' 
                       }}>
                         <span style={{ fontSize: 16 }}>🛡️</span>
                         <div>
-                          <div className="security-label" style={{ color: '#fff' }}>Data Privacy & GDPR</div>
-                          <div className="security-value" style={{ fontSize: 11, color: gdprStatus === 'RISK_FLAGGED' ? '#fb7185' : gdprStatus === 'VERIFIED' ? '#a5b4fc' : '#64748b' }} title={gdprDetails}>
+                          <div className="security-label" style={{ color: '#0F172A' }}>Data Privacy & GDPR</div>
+                          <div className="security-value" style={{ fontSize: 11, color: gdprStatus === 'RISK_FLAGGED' ? '#fb7185' : gdprStatus === 'VERIFIED' ? '#3b82f6' : '#64748b' }} title={gdprDetails}>
                             {gdprStatus === 'RISK_FLAGGED' ? '⚠️ Compliance Risk' : gdprStatus === 'VERIFIED' ? '✓ GDPR Verified' : '🔍 No Privacy Terms'}
                           </div>
                         </div>
@@ -494,13 +494,13 @@ export function ContractDetail({
 
                       {/* Indemnification check */}
                       <div className="security-item" style={{ 
-                        border: indemnityStatus === 'RISK_FLAGGED' ? '1px solid rgba(244, 63, 94, 0.2)' : indemnityStatus === 'VERIFIED' ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(255,255,255,0.06)', 
+                        border: indemnityStatus === 'RISK_FLAGGED' ? '1px solid rgba(244, 63, 94, 0.2)' : indemnityStatus === 'VERIFIED' ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(0,0,0,0.06)', 
                         background: indemnityStatus === 'RISK_FLAGGED' ? 'rgba(244, 63, 94, 0.02)' : indemnityStatus === 'VERIFIED' ? 'rgba(16, 185, 129, 0.02)' : 'transparent' 
                       }}>
                         <span style={{ fontSize: 16 }}>⚖️</span>
                         <div>
-                          <div className="security-label" style={{ color: '#fff' }}>Indemnity Boundaries</div>
-                          <div className="security-value" style={{ fontSize: 11, color: indemnityStatus === 'RISK_FLAGGED' ? '#fb7185' : indemnityStatus === 'VERIFIED' ? '#a5b4fc' : '#64748b' }} title={indemnityDetails}>
+                          <div className="security-label" style={{ color: '#0F172A' }}>Indemnity Boundaries</div>
+                          <div className="security-value" style={{ fontSize: 11, color: indemnityStatus === 'RISK_FLAGGED' ? '#fb7185' : indemnityStatus === 'VERIFIED' ? '#3b82f6' : '#64748b' }} title={indemnityDetails}>
                             {indemnityStatus === 'RISK_FLAGGED' ? '⚠️ Indemnity Risk' : indemnityStatus === 'VERIFIED' ? '✓ Indemnity Clause' : '🔍 No Indemnity Terms'}
                           </div>
                         </div>
@@ -511,13 +511,13 @@ export function ContractDetail({
 
                       {/* Liability Cap check */}
                       <div className="security-item" style={{ 
-                        border: liabilityStatus === 'RISK_FLAGGED' ? '1px solid rgba(244, 63, 94, 0.2)' : liabilityStatus === 'VERIFIED' ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(255,255,255,0.06)', 
+                        border: liabilityStatus === 'RISK_FLAGGED' ? '1px solid rgba(244, 63, 94, 0.2)' : liabilityStatus === 'VERIFIED' ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(0,0,0,0.06)', 
                         background: liabilityStatus === 'RISK_FLAGGED' ? 'rgba(244, 63, 94, 0.02)' : liabilityStatus === 'VERIFIED' ? 'rgba(16, 185, 129, 0.02)' : 'transparent' 
                       }}>
                         <span style={{ fontSize: 16 }}>💸</span>
                         <div>
-                          <div className="security-label" style={{ color: '#fff' }}>Liability Cap Limit</div>
-                          <div className="security-value" style={{ fontSize: 11, color: liabilityStatus === 'RISK_FLAGGED' ? '#fb7185' : liabilityStatus === 'VERIFIED' ? '#a5b4fc' : '#64748b' }} title={liabilityDetails}>
+                          <div className="security-label" style={{ color: '#0F172A' }}>Liability Cap Limit</div>
+                          <div className="security-value" style={{ fontSize: 11, color: liabilityStatus === 'RISK_FLAGGED' ? '#fb7185' : liabilityStatus === 'VERIFIED' ? '#3b82f6' : '#64748b' }} title={liabilityDetails}>
                             {liabilityStatus === 'RISK_FLAGGED' ? '⚠️ Liability Risk' : liabilityStatus === 'VERIFIED' ? '✓ Liability Cap Bound' : '🔍 No Liability Cap'}
                           </div>
                         </div>
@@ -528,13 +528,13 @@ export function ContractDetail({
 
                       {/* Governing Law check */}
                       <div className="security-item" style={{ 
-                        border: govLawStatus === 'RISK_FLAGGED' ? '1px solid rgba(244, 63, 94, 0.2)' : govLawStatus === 'VERIFIED' ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(255,255,255,0.06)', 
+                        border: govLawStatus === 'RISK_FLAGGED' ? '1px solid rgba(244, 63, 94, 0.2)' : govLawStatus === 'VERIFIED' ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(0,0,0,0.06)', 
                         background: govLawStatus === 'RISK_FLAGGED' ? 'rgba(244, 63, 94, 0.02)' : govLawStatus === 'VERIFIED' ? 'rgba(16, 185, 129, 0.02)' : 'transparent' 
                       }}>
                         <span style={{ fontSize: 16 }}>🌍</span>
                         <div>
-                          <div className="security-label" style={{ color: '#fff' }}>Governing Jurisdiction</div>
-                          <div className="security-value" style={{ fontSize: 11, color: govLawStatus === 'RISK_FLAGGED' ? '#fb7185' : govLawStatus === 'VERIFIED' ? '#a5b4fc' : '#64748b' }} title={govLawDetails}>
+                          <div className="security-label" style={{ color: '#0F172A' }}>Governing Jurisdiction</div>
+                          <div className="security-value" style={{ fontSize: 11, color: govLawStatus === 'RISK_FLAGGED' ? '#fb7185' : govLawStatus === 'VERIFIED' ? '#3b82f6' : '#64748b' }} title={govLawDetails}>
                             {govLawStatus === 'RISK_FLAGGED' ? '⚠️ Jurisdiction Risk' : govLawStatus === 'VERIFIED' ? '✓ Jurisdiction OK' : '🔍 No Jurisdiction'}
                           </div>
                         </div>
@@ -564,17 +564,17 @@ export function ContractDetail({
                     </div>
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ color: '#cbd5e1', fontSize: '13px' }}>
-                        📅 Expiration Date: <strong style={{ color: '#fff' }}>{selectedContract.expirationDate || 'Jul 28, 2027'}</strong>
+                      <div style={{ color: '#334155', fontSize: '13px' }}>
+                        📅 Expiration Date: <strong style={{ color: '#0F172A' }}>{selectedContract.expirationDate || 'Jul 28, 2027'}</strong>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>Notify alert threshold:</span>
+                        <span style={{ fontSize: '12px', color: '#64748B' }}>Notify alert threshold:</span>
                         <select 
                           className="input-field"
                           value={selectedThreshold}
                           onChange={(e) => setSelectedThreshold(Number(e.target.value))}
-                          style={{ padding: '6px 12px', fontSize: '12px', width: 'auto', height: 'auto', background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(255,255,255,0.08)' }}
+                          style={{ padding: '6px 12px', fontSize: '12px', width: 'auto', height: 'auto', background: '#FFFFFF', border: '1px solid rgba(203, 213, 225, 0.8)' }}
                         >
                           <option value={15}>15 Days before</option>
                           <option value={30}>30 Days before</option>
@@ -629,8 +629,8 @@ export function ContractDetail({
               ) : (
                 <div style={{ textAlign: 'center', padding: '60px 20px' }}>
                   <div style={{ fontSize: '48px', marginBottom: 20 }}>📊</div>
-                  <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#fff', marginBottom: 10 }}>AI Legal Report Pending</h3>
-                  <p style={{ color: '#94a3b8', fontSize: '14px', maxWidth: '360px', margin: '0 auto 24px', lineHeight: 1.5 }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#0F172A', marginBottom: 10 }}>AI Legal Report Pending</h3>
+                  <p style={{ color: '#64748B', fontSize: '14px', maxWidth: '360px', margin: '0 auto 24px', lineHeight: 1.5 }}>
                     No AI evaluation has been executed for this contract version yet.
                   </p>
                   <button 
@@ -716,9 +716,9 @@ export function ContractDetail({
                           lineHeight: 1.5,
                           whiteSpace: 'pre-wrap',
                           wordBreak: 'break-word',
-                          background: msg.sender === 'user' ? '#8b5cf6' : 'rgba(255,255,255,0.04)',
-                          color: msg.sender === 'user' ? '#fff' : '#cbd5e1',
-                          border: msg.sender === 'user' ? 'none' : '1px solid rgba(255,255,255,0.06)'
+                          background: msg.sender === 'user' ? 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)' : '#F1F5F9',
+                          color: msg.sender === 'user' ? '#fff' : '#1E293B',
+                          border: msg.sender === 'user' ? 'none' : '1px solid #E2E8F0'
                         }}
                       >
                         {msg.text}
@@ -726,7 +726,7 @@ export function ContractDetail({
                     ))
                   )}
                   {isSendingChat && (
-                    <div style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', color: '#64748b', fontSize: 13 }}>
+                    <div style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 12, background: '#F1F5F9', border: '1px solid #E2E8F0', color: '#64748b', fontSize: 13 }}>
                       <span className="spinner" style={{ width: 14, height: 14 }}></span>
                       <span>AI is reading contract chunks...</span>
                     </div>
@@ -734,14 +734,14 @@ export function ContractDetail({
                 </div>
 
                 {/* Input Form */}
-                <form ref={chatFormRef} onSubmit={handleSendChatMessage} style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 15, display: 'flex', gap: 10 }}>
+                <form ref={chatFormRef} onSubmit={handleSendChatMessage} style={{ borderTop: '1px solid rgba(226, 232, 240, 0.8)', paddingTop: 15, display: 'flex', gap: 10 }}>
                   <input 
                     type="text" 
                     className="input-field" 
                     placeholder="Type question about this agreement..."
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
-                    style={{ flex: 1, padding: '12px', fontSize: 13, margin: 0, color: '#fff' }}
+                    style={{ flex: 1, padding: '12px', fontSize: 13, margin: 0 }}
                     disabled={isSendingChat}
                   />
                   <button 
@@ -805,10 +805,10 @@ export function ContractDetail({
                           {initials}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span className="comment-author" style={{ fontWeight: '600', fontSize: '12px', color: '#fff' }}>
+                          <span className="comment-author" style={{ fontWeight: '600', fontSize: '12px', color: '#0F172A' }}>
                             {emailName}
                           </span>
-                          <span style={{ fontSize: '10px', color: '#94a3b8' }}>
+                          <span style={{ fontSize: '10px', color: '#64748B' }}>
                             {authorRole}
                           </span>
                         </div>
@@ -816,12 +816,12 @@ export function ContractDetail({
                           {new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <div className="comment-body" style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.4, wordBreak: 'break-word', paddingLeft: '38px' }}>
+                      <div className="comment-body" style={{ fontSize: 13, color: '#334155', lineHeight: 1.4, wordBreak: 'break-word', paddingLeft: '38px' }}>
                         {c.content}
                       </div>
                       <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-start', paddingLeft: '38px' }}>
                         {c.vendorFacing ? (
-                          <span className="badge" style={{ fontSize: 9, background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '2px 6px' }}>
+                          <span className="badge" style={{ fontSize: 9, background: 'rgba(59, 130, 246, 0.08)', color: '#2563eb', border: '1px solid rgba(59, 130, 246, 0.15)', padding: '2px 6px' }}>
                             🌐 VENDOR FACING
                           </span>
                         ) : (
