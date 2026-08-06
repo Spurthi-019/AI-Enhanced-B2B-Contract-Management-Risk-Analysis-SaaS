@@ -80,6 +80,17 @@ public class TenantController {
                     return roleRepository.save(r);
                 });
 
+        // 3.5 Check plan user seat limits
+        java.util.List<User> workspaceUsers = userRepository.findByTenantId(tenant.getId());
+        long currentUsersCount = workspaceUsers.size();
+        String currentPlan = tenant.getSubscriptionPlan() != null ? tenant.getSubscriptionPlan() : "FREE";
+        if (currentPlan.equals("FREE") && currentUsersCount >= 2) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Invitation failed: Free tier is limited to 2 users. Please upgrade to Pro.");
+        }
+        if (currentPlan.equals("PRO") && currentUsersCount >= 20) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Invitation failed: Pro tier is limited to 20 users. Please upgrade to Enterprise.");
+        }
+
         // 4. Check if the invited email already exists in system database
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "User email address is already registered in the system");
@@ -162,7 +173,8 @@ public class TenantController {
                 tenant.getAiModel(),
                 tenant.getRiskSensitivity(),
                 tenant.getMagicLinkExpiryDays(),
-                tenant.getWebhookUrl()
+                tenant.getWebhookUrl(),
+                tenant.getSubscriptionPlan()
         );
         return ResponseEntity.ok(dto);
     }
@@ -207,7 +219,45 @@ public class TenantController {
                 savedTenant.getAiModel(),
                 savedTenant.getRiskSensitivity(),
                 savedTenant.getMagicLinkExpiryDays(),
-                savedTenant.getWebhookUrl()
+                savedTenant.getWebhookUrl(),
+                savedTenant.getSubscriptionPlan()
+        );
+        return ResponseEntity.ok(responseDto);
+    }
+
+    @PutMapping("/subscription")
+    @Transactional
+    public ResponseEntity<com.contractiq.dto.TenantSettingsDto> updateSubscriptionPlan(
+            Principal principal,
+            @RequestParam("plan") String plan
+    ) {
+        log.info("Request to update subscription plan to {} received from user: {}", plan, principal.getName());
+        
+        UUID userId = UUID.fromString(principal.getName());
+        User currentUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+                
+        Tenant tenant = currentUser.getTenant();
+        if (tenant == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Current user is not mapped to any tenant workspace");
+        }
+        
+        String upperPlan = plan.toUpperCase();
+        if (!upperPlan.equals("FREE") && !upperPlan.equals("PRO") && !upperPlan.equals("ENTERPRISE")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid subscription plan. Must be FREE, PRO, or ENTERPRISE");
+        }
+        
+        tenant.setSubscriptionPlan(upperPlan);
+        Tenant savedTenant = tenantRepository.save(tenant);
+        
+        com.contractiq.dto.TenantSettingsDto responseDto = new com.contractiq.dto.TenantSettingsDto(
+                savedTenant.getCompanyName() != null ? savedTenant.getCompanyName() : savedTenant.getName(),
+                savedTenant.getDomain(),
+                savedTenant.getAiModel(),
+                savedTenant.getRiskSensitivity(),
+                savedTenant.getMagicLinkExpiryDays(),
+                savedTenant.getWebhookUrl(),
+                savedTenant.getSubscriptionPlan()
         );
         return ResponseEntity.ok(responseDto);
     }

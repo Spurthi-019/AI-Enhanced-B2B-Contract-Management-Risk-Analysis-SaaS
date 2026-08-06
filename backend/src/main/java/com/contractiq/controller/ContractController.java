@@ -57,6 +57,7 @@ public class ContractController {
     private final EmailNotificationService emailNotificationService;
     private final ChatModel chatModel;
     private final VectorStore vectorStore;
+    private final com.contractiq.repository.TenantRepository tenantRepository;
 
     public ContractController(
             ContractDocumentRepository contractDocumentRepository,
@@ -65,7 +66,8 @@ public class ContractController {
             VendorTokenService vendorTokenService,
             EmailNotificationService emailNotificationService,
             ChatModel chatModel,
-            VectorStore vectorStore
+            VectorStore vectorStore,
+            com.contractiq.repository.TenantRepository tenantRepository
     ) {
         this.contractDocumentRepository = contractDocumentRepository;
         this.vectorIndexingService = vectorIndexingService;
@@ -74,6 +76,7 @@ public class ContractController {
         this.emailNotificationService = emailNotificationService;
         this.chatModel = chatModel;
         this.vectorStore = vectorStore;
+        this.tenantRepository = tenantRepository;
     }
 
     @GetMapping
@@ -94,10 +97,23 @@ public class ContractController {
     ) {
         log.info("Received contract upload request for title: {}", title);
 
-        // 1. Get and validate tenant ID from TenantContext
         String tenantId = TenantContext.getTenantId();
         if (tenantId == null || tenantId.trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing tenant context");
+        }
+
+        // 1.5 Verify subscription plan limits
+        java.util.UUID tenantUuid = java.util.UUID.fromString(tenantId);
+        com.contractiq.domain.Tenant tenant = tenantRepository.findById(tenantUuid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant workspace not found"));
+        
+        long existingContractsCount = contractDocumentRepository.countByTenantId(tenantId);
+        String plan = tenant.getSubscriptionPlan() != null ? tenant.getSubscriptionPlan() : "FREE";
+        if (plan.equals("FREE") && existingContractsCount >= 2) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Upload failed: Free tier is limited to 2 contracts. Please upgrade to Pro or Enterprise.");
+        }
+        if (plan.equals("PRO") && existingContractsCount >= 100) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Upload failed: Pro tier is limited to 100 contracts. Please upgrade to Enterprise.");
         }
 
         // 2. Validate file presence & criteria
@@ -176,6 +192,26 @@ public class ContractController {
 
         int currentVersion = contractDoc.getCurrentVersion();
         ContractAnalysisResponse analysis = contractAnalysisService.analyzeContract(id, tenantId, currentVersion);
+
+        java.util.UUID tenantUuid = java.util.UUID.fromString(tenantId);
+        com.contractiq.domain.Tenant tenant = tenantRepository.findById(tenantUuid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant workspace not found"));
+        
+        String plan = tenant.getSubscriptionPlan() != null ? tenant.getSubscriptionPlan() : "FREE";
+        if (plan.equals("FREE")) {
+            if (analysis != null) {
+                if (analysis.getRiskClauses() != null) {
+                    analysis.getRiskClauses().clear();
+                }
+                com.contractiq.dto.ComplianceChecklist checklist = analysis.getComplianceChecklist();
+                if (checklist != null) {
+                    checklist.setGdprDetails("Upgrade to Pro/Enterprise plan to unlock detailed GDPR compliance reports.");
+                    checklist.setIndemnityDetails("Upgrade to Pro/Enterprise plan to unlock detailed Indemnification boundaries analysis.");
+                    checklist.setLiabilityDetails("Upgrade to Pro/Enterprise plan to unlock detailed Liability Limit assessment.");
+                    checklist.setGovLawDetails("Upgrade to Pro/Enterprise plan to unlock detailed Jurisdiction review.");
+                }
+            }
+        }
 
         // Update active version inside versionHistory
         ContractVersion activeVersion = null;
@@ -565,6 +601,15 @@ public class ContractController {
         String tenantId = TenantContext.getTenantId();
         if (tenantId == null || tenantId.trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing tenant context");
+        }
+
+        java.util.UUID tenantUuid = java.util.UUID.fromString(tenantId);
+        com.contractiq.domain.Tenant tenant = tenantRepository.findById(tenantUuid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant workspace not found"));
+        
+        String plan = tenant.getSubscriptionPlan() != null ? tenant.getSubscriptionPlan() : "FREE";
+        if (plan.equals("FREE")) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Contract Chat is not available on the Free plan. Please upgrade to Pro or Enterprise.");
         }
 
         ContractDocument contractDoc = contractDocumentRepository.findById(id)

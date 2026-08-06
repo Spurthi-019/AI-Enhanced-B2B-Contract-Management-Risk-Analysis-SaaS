@@ -14,4 +14,5 @@ public class TenantSettingsDto {
     private String riskSensitivity;
     private Integer magicLinkExpiryDays;
     private String webhookUrl;
+    private String subscriptionPlan;
 }
