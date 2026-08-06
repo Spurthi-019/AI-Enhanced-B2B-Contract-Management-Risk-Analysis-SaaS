@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface ContractDocumentRepository extends MongoRepository<ContractDocument, String> {
     List<ContractDocument> findByTenantId(String tenantId);
+    long countByTenantId(String tenantId);
 }

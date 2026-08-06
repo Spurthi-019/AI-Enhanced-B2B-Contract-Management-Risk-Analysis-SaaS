@@ -3,10 +3,9 @@ import React from 'react';
 interface LandingPageProps {
   token: string | null;
   navigate: (to: string) => void;
-  showToast: (msg: string) => void;
 }
 
-export function LandingPage({ token, navigate, showToast }: LandingPageProps) {
+export function LandingPage({ token, navigate }: LandingPageProps) {
   const [emailInput, setEmailInput] = React.useState('');
 
   const handleQuickRegister = (e: React.FormEvent) => {

@@ -53,6 +53,7 @@ interface AuditActivity {
   id: string;
   description: string;
   timestamp: string;
+  createdAt: Date;
 }
 
 const BACKEND_URL = 'http://localhost:8081';
@@ -68,6 +69,18 @@ const parseJwt = (token: string) => {
   } catch (e) {
     return null;
   }
+};
+
+const parseErrorMessage = (errText: string, fallback: string = 'Error occurred') => {
+  try {
+    const parsed = JSON.parse(errText);
+    if (parsed && parsed.message) {
+      return parsed.message;
+    }
+  } catch (e) {
+    // not JSON
+  }
+  return errText || fallback;
 };
 
 function App() {
@@ -106,13 +119,15 @@ function App() {
     riskSensitivity: string;
     magicLinkExpiryDays: number;
     webhookUrl: string;
+    subscriptionPlan: string;
   }>({
     companyName: '',
     domain: '',
     aiModel: 'llama3',
     riskSensitivity: 'MEDIUM',
     magicLinkExpiryDays: 7,
-    webhookUrl: ''
+    webhookUrl: '',
+    subscriptionPlan: 'FREE'
   });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
@@ -154,11 +169,10 @@ function App() {
   }, [token, isAdmin]);
 
   // Dashboard & Navigation states
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'contracts' | 'upload' | 'settings'>('dashboard');
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [activities, setActivities] = useState<AuditActivity[]>([
-    { id: '1', description: 'System database initializer completed.', timestamp: 'Just now' }
+    { id: '1', description: 'System database initializer completed.', timestamp: 'Just now', createdAt: new Date() }
   ]);
   
   // Pagination & Search states
@@ -170,7 +184,6 @@ function App() {
   // Form states
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [newVersionFile, setNewVersionFile] = useState<File | null>(null);
   
   // Comment states
   const [commentContent, setCommentContent] = useState('');
@@ -184,7 +197,13 @@ function App() {
   const [toast, setToast] = useState<string | null>(null);
   
   // Vendor portal states
-  const [vendorPortalToken, setVendorPortalToken] = useState<string | null>(null);
+  const [vendorPortalToken, setVendorPortalToken] = useState<string | null>(() => {
+    if (window.location.pathname.startsWith('/vendor/review')) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('token');
+    }
+    return null;
+  });
   const [vendorPortalData, setVendorPortalData] = useState<any | null>(null);
 
   // Path routing states
@@ -272,7 +291,8 @@ function App() {
     const newAct = {
       id: Math.random().toString(),
       description: desc,
-      timestamp: new Date().toLocaleTimeString()
+      timestamp: new Date().toLocaleTimeString(),
+      createdAt: new Date()
     };
     setActivities(prev => [newAct, ...prev]);
   };
@@ -306,7 +326,7 @@ function App() {
     setCurrentUser(null);
     setContracts([]);
     setSelectedContract(null);
-    setTenantSettings({ companyName: '', domain: '', aiModel: 'llama3', riskSensitivity: 'MEDIUM', magicLinkExpiryDays: 7, webhookUrl: '' });
+    setTenantSettings({ companyName: '', domain: '', aiModel: 'llama3', riskSensitivity: 'MEDIUM', magicLinkExpiryDays: 7, webhookUrl: '', subscriptionPlan: 'FREE' });
     showToast('Logged out of ContractIQ session.');
     addActivity('User logged out of active workspace.');
     navigate('/');
@@ -377,7 +397,6 @@ function App() {
         
         // Auto trigger analysis
         triggerAnalysis(doc.id, doc.title);
-        setActiveTab('contracts');
         navigate('/contracts');
       } else {
         const errText = await res.text();
@@ -492,36 +511,6 @@ function App() {
       showToast('Error during RAG risk evaluation');
     } finally {
       setIsAnalyzing(false);
-    }
-  };
-
-  // Upload revised version
-  const handleVersionUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newVersionFile || !selectedContract) return;
-
-    const formData = new FormData();
-    formData.append('file', newVersionFile);
-
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/v1/contracts/${selectedContract.id}/versions`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData
-      });
-      if (res.ok) {
-        const updatedDoc = await res.json();
-        setSelectedContract(updatedDoc);
-        setContracts(prev => prev.map(c => c.id === updatedDoc.id ? updatedDoc : c));
-        setNewVersionFile(null);
-        showToast(`Successfully uploaded revised version ${updatedDoc.currentVersion}!`);
-        addActivity(`Uploaded version ${updatedDoc.currentVersion} for "${updatedDoc.title}".`);
-      } else {
-        const errText = await res.text();
-        showToast(`Version upload failed: ${errText}`);
-      }
-    } catch (err) {
-      showToast('Network error uploading new version');
     }
   };
 
@@ -718,10 +707,31 @@ function App() {
         navigate('/login');
       } else {
         const errText = await res.text();
-        showToast(`Registration failed: ${errText || 'Invalid details'}`);
+        showToast(`Registration failed: ${parseErrorMessage(errText, 'Invalid details')}`);
       }
     } catch (err) {
       showToast('Network error during registration');
+    }
+  };
+
+  // Change Subscription Plan
+  const handleSelectPlan = async (planName: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/tenants/subscription?plan=${planName}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const settings = await res.json();
+        setTenantSettings(settings);
+        showToast(`Subscription plan updated to ${planName} successfully!`);
+        addActivity(`Subscription plan updated to ${planName}.`);
+      } else {
+        const errText = await res.text();
+        showToast(`Failed to update plan: ${parseErrorMessage(errText)}`);
+      }
+    } catch (err) {
+      showToast('Network error during subscription plan update');
     }
   };
 
@@ -749,7 +759,7 @@ function App() {
         setShowInviteModal(false);
       } else {
         const errText = await res.text();
-        showToast(`Failed to send invitation: ${errText || 'Access Denied'}`);
+        showToast(`Failed to send invitation: ${parseErrorMessage(errText, 'Access Denied')}`);
       }
     } catch (err) {
       showToast('Network error sending invitation');
@@ -790,7 +800,7 @@ function App() {
       });
       if (res.ok) {
         const commentsList = await res.json();
-        setVendorPortalData(prev => ({
+        setVendorPortalData((prev: any) => ({
           ...prev,
           comments: commentsList
         }));
@@ -858,11 +868,6 @@ function App() {
     const lastVer = c.versionHistory[c.versionHistory.length - 1];
     return lastVer?.analysis?.summary.overallRiskLevel === 'HIGH';
   }).length;
-  const pendingReviewsCount = contracts.filter(c => {
-    const lastVer = c.versionHistory[c.versionHistory.length - 1];
-    return !lastVer?.analysis;
-  }).length;
-
   const expiringSoonContracts = contracts.filter(doc => {
     if (!doc.expirationDate) return false;
     try {
@@ -1081,7 +1086,7 @@ function App() {
 
   // Render Landing Page at '/'
   if (currentPath === '/') {
-    return <LandingPage token={token} navigate={navigate} showToast={showToast} />;
+    return <LandingPage token={token} navigate={navigate} />;
   }
 
   // Render Register Page
@@ -1199,10 +1204,6 @@ function App() {
       </div>
     );
   }
-
-  const activeVersionObj = selectedContract?.versionHistory.find(
-    v => v.versionNumber === selectedVersion
-  );
 
 
   return (
@@ -1628,6 +1629,7 @@ function App() {
                 BACKEND_URL={BACKEND_URL}
                 onUpdateContractStatus={handleUpdateContractStatus}
                 onUpdateReminderThreshold={handleUpdateReminderThreshold}
+                subscriptionPlan={tenantSettings.subscriptionPlan}
               />
             ) : contracts.length === 0 ? (
               <div className="empty-state" style={{ padding: '60px 40px', textAlign: 'center', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
@@ -1703,7 +1705,7 @@ function App() {
                             const riskLevel = lastVer?.analysis?.summary.overallRiskLevel || 'PENDING';
                             
                             // Expiry logic: alert color accent only if expires <= 30 days
-                            const checkExpiresSoon = (expiryStr: string) => {
+                            const checkExpiresSoon = (expiryStr: string | undefined) => {
                               if (!expiryStr) return false;
                               try {
                                 const expDate = new Date(expiryStr);
@@ -1717,7 +1719,7 @@ function App() {
                             };
                             const isUrgent = checkExpiresSoon(doc.expirationDate);
 
-                            const formatSimpleDate = (expiryStr: string) => {
+                            const formatSimpleDate = (expiryStr: string | undefined) => {
                               if (!expiryStr) return '—';
                               const match = expiryStr.match(/(\d{4})-(\d{2})-(\d{2})/);
                               if (match) {
@@ -2120,18 +2122,26 @@ function App() {
             <div className="metrics-grid" style={{ marginBottom: 30 }}>
               <div className="metric-card" style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(99, 102, 241, 0.05) 100%)', border: '1px solid rgba(59, 130, 246, 0.15)' }}>
                 <span className="metric-label" style={{ color: '#2563eb' }}>Active Plan Tier</span>
-                <span className="metric-value" style={{ fontSize: 24, marginTop: 5, color: 'var(--text-primary)' }}>Enterprise Pro</span>
-                <span className="metric-trend" style={{ color: '#3b82f6' }}>✓ Auto-renews Aug 24</span>
+                <span className="metric-value" style={{ fontSize: 24, marginTop: 5, color: 'var(--text-primary)' }}>
+                  {tenantSettings.subscriptionPlan === 'FREE' ? 'Free Starter' : tenantSettings.subscriptionPlan === 'PRO' ? 'Pro Plan' : 'Enterprise Plan'}
+                </span>
+                <span className="metric-trend" style={{ color: '#3b82f6' }}>✓ Active status</span>
               </div>
               <div className="metric-card">
                 <span className="metric-label">Monthly Charge</span>
-                <span className="metric-value" style={{ fontSize: 24, marginTop: 5, color: 'var(--text-primary)' }}>$499.00</span>
-                <span className="metric-trend">Invoice sent to company admin</span>
+                <span className="metric-value" style={{ fontSize: 24, marginTop: 5, color: 'var(--text-primary)' }}>
+                  {tenantSettings.subscriptionPlan === 'FREE' ? '$0.00' : tenantSettings.subscriptionPlan === 'PRO' ? '$149.00' : '$499.00'}
+                </span>
+                <span className="metric-trend">Simulated database billing</span>
               </div>
               <div className="metric-card">
-                <span className="metric-label">Workspace User Seats</span>
-                <span className="metric-value" style={{ fontSize: 24, marginTop: 5, color: 'var(--text-primary)' }}>{workspaceUsers.length} seats</span>
-                <span className="metric-trend">✓ Uncapped seats active</span>
+                <span className="metric-label">Workspace Roster Limits</span>
+                <span className="metric-value" style={{ fontSize: 24, marginTop: 5, color: 'var(--text-primary)' }}>
+                  {workspaceUsers.length} {tenantSettings.subscriptionPlan === 'FREE' ? '/ 2' : tenantSettings.subscriptionPlan === 'PRO' ? '/ 20' : ''} seats
+                </span>
+                <span className="metric-trend">
+                  {tenantSettings.subscriptionPlan === 'FREE' ? '2 users limit' : tenantSettings.subscriptionPlan === 'PRO' ? '20 users limit' : 'Unlimited users'}
+                </span>
               </div>
             </div>
 
@@ -2140,37 +2150,101 @@ function App() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5 }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>RAG Vector Index Storage</span>
-                    <span style={{ color: 'var(--text-muted)' }}>348 MB / 10 GB (3.48%)</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>Contract Document Storage Limit</span>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      {contracts.length} {tenantSettings.subscriptionPlan === 'FREE' ? '/ 2' : tenantSettings.subscriptionPlan === 'PRO' ? '/ 100' : ''} agreements
+                    </span>
                   </div>
                   <div style={{ background: 'rgba(0,0,0,0.05)', height: 6, borderRadius: 3 }}>
-                    <div style={{ background: '#3b82f6', width: '3.48%', height: '100%', borderRadius: 3 }}></div>
+                    <div style={{ 
+                      background: '#3b82f6', 
+                      width: tenantSettings.subscriptionPlan === 'FREE' ? `${Math.min(100, (contracts.length / 2) * 100)}%` : tenantSettings.subscriptionPlan === 'PRO' ? `${Math.min(100, (contracts.length / 100) * 100)}%` : '1%', 
+                      height: '100%', 
+                      borderRadius: 3 
+                    }}></div>
                   </div>
                 </div>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5 }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>AI Prompt Completions Limit</span>
-                    <span style={{ color: 'var(--text-muted)' }}>872 / 10,000 queries</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>RAG Index Storage Size</span>
+                    <span style={{ color: 'var(--text-muted)' }}>348 MB / 10 GB (3.48%)</span>
                   </div>
                   <div style={{ background: 'rgba(0,0,0,0.05)', height: 6, borderRadius: 3 }}>
-                    <div style={{ background: '#10b981', width: '8.72%', height: '100%', borderRadius: 3 }}></div>
+                    <div style={{ background: '#10b981', width: '3.48%', height: '100%', borderRadius: 3 }}></div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <h3 className="input-label" style={{ fontSize: 14, color: '#0F172A', marginBottom: 15 }}>Available Upgrades</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-              <div className="metric-card" style={{ textAlign: 'center', opacity: 0.6 }}>
-                <span className="metric-label" style={{ fontSize: 14, fontWeight: 'bold' }}>Legal Pro Plan</span>
-                <span className="metric-value" style={{ fontSize: 22, margin: '10px 0', color: '#0F172A' }}>$149/mo</span>
-                <span className="metric-trend" style={{ fontSize: 11 }}>Limited to 50 contracts & 2,000 queries</span>
+            <h3 className="input-label" style={{ fontSize: 14, color: 'var(--text-primary)', marginBottom: 15 }}>Upgrade Workspace subscriptionPlan</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 15 }}>
+              {/* Free Card */}
+              <div className="metric-card" style={{ 
+                textAlign: 'center', 
+                border: tenantSettings.subscriptionPlan === 'FREE' ? '2px solid #10b981' : '1px solid var(--border-color)',
+                background: tenantSettings.subscriptionPlan === 'FREE' ? 'rgba(16, 185, 129, 0.02)' : 'transparent',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                padding: '15px'
+              }}>
+                <div>
+                  {tenantSettings.subscriptionPlan === 'FREE' && <div className="badge badge-low" style={{ alignSelf: 'center', marginBottom: 8, fontSize: 10 }}>Active Plan</div>}
+                  <span className="metric-label" style={{ fontSize: 14, fontWeight: 'bold', color: 'var(--text-primary)' }}>Starter Free</span>
+                  <span className="metric-value" style={{ fontSize: 20, margin: '8px 0', display: 'block', color: 'var(--text-primary)' }}>$0 / mo</span>
+                  <span className="metric-trend" style={{ fontSize: 11, color: 'var(--text-muted)' }}>Max 2 contracts, 2 users. Basic summaries. No AI Chat.</span>
+                </div>
+                {tenantSettings.subscriptionPlan !== 'FREE' && (
+                  <button className="btn btn-secondary" style={{ width: '100%', marginTop: 12, padding: '6px 12px', fontSize: 12 }} onClick={() => handleSelectPlan('FREE')}>
+                    Downgrade
+                  </button>
+                )}
               </div>
-              <div className="metric-card" style={{ textAlign: 'center', border: '2px solid #3b82f6', background: 'rgba(59, 130, 246, 0.02)' }}>
-                <div className="badge badge-high" style={{ alignSelf: 'center', marginBottom: 5 }}>Active Plan</div>
-                <span className="metric-label" style={{ fontSize: 14, fontWeight: 'bold', color: '#0F172A' }}>Enterprise Pro Plan</span>
-                <span className="metric-value" style={{ fontSize: 22, margin: '10px 0', color: '#0F172A' }}>$499/mo</span>
-                <span className="metric-trend" style={{ fontSize: 11, color: '#3b82f6' }}>Unlimited contracts, vector storage & SLA support</span>
+
+              {/* Pro Card */}
+              <div className="metric-card" style={{ 
+                textAlign: 'center', 
+                border: tenantSettings.subscriptionPlan === 'PRO' ? '2px solid #3b82f6' : '1px solid var(--border-color)',
+                background: tenantSettings.subscriptionPlan === 'PRO' ? 'rgba(59, 130, 246, 0.02)' : 'transparent',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                padding: '15px'
+              }}>
+                <div>
+                  {tenantSettings.subscriptionPlan === 'PRO' && <div className="badge badge-high" style={{ alignSelf: 'center', marginBottom: 8, fontSize: 10, background: '#3b82f6', borderColor: '#2563eb' }}>Active Plan</div>}
+                  <span className="metric-label" style={{ fontSize: 14, fontWeight: 'bold', color: 'var(--text-primary)' }}>Legal Pro</span>
+                  <span className="metric-value" style={{ fontSize: 20, margin: '8px 0', display: 'block', color: 'var(--text-primary)' }}>$149 / mo</span>
+                  <span className="metric-trend" style={{ fontSize: 11, color: 'var(--text-muted)' }}>Max 100 contracts, 20 users. Advanced AI, AI Chat enabled.</span>
+                </div>
+                {tenantSettings.subscriptionPlan !== 'PRO' && (
+                  <button className="btn" style={{ width: '100%', marginTop: 12, padding: '6px 12px', fontSize: 12, background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)' }} onClick={() => handleSelectPlan('PRO')}>
+                    {tenantSettings.subscriptionPlan === 'FREE' ? 'Upgrade' : 'Downgrade'}
+                  </button>
+                )}
+              </div>
+
+              {/* Enterprise Card */}
+              <div className="metric-card" style={{ 
+                textAlign: 'center', 
+                border: tenantSettings.subscriptionPlan === 'ENTERPRISE' ? '2px solid #8b5cf6' : '1px solid var(--border-color)',
+                background: tenantSettings.subscriptionPlan === 'ENTERPRISE' ? 'rgba(139, 92, 246, 0.02)' : 'transparent',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                padding: '15px'
+              }}>
+                <div>
+                  {tenantSettings.subscriptionPlan === 'ENTERPRISE' && <div className="badge badge-high" style={{ alignSelf: 'center', marginBottom: 8, fontSize: 10, background: '#8b5cf6', borderColor: '#7c3aed' }}>Active Plan</div>}
+                  <span className="metric-label" style={{ fontSize: 14, fontWeight: 'bold', color: 'var(--text-primary)' }}>Enterprise Pro</span>
+                  <span className="metric-value" style={{ fontSize: 20, margin: '8px 0', display: 'block', color: 'var(--text-primary)' }}>$499 / mo</span>
+                  <span className="metric-trend" style={{ fontSize: 11, color: 'var(--text-muted)' }}>Unlimited contracts & users. Full AI suite, priority support.</span>
+                </div>
+                {tenantSettings.subscriptionPlan !== 'ENTERPRISE' && (
+                  <button className="btn" style={{ width: '100%', marginTop: 12, padding: '6px 12px', fontSize: 12, background: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)' }} onClick={() => handleSelectPlan('ENTERPRISE')}>
+                    Upgrade
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -2191,17 +2265,29 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {activities.map(act => (
-                  <tr key={act.id}>
-                    <td style={{ fontWeight: '600' }}>⚡ {act.description}</td>
-                    <td style={{ color: '#94a3b8', fontSize: 13 }}>{act.timestamp}</td>
-                    <td>
-                      <span className="badge" style={{ background: 'rgba(52, 211, 153, 0.1)', color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.2)' }}>
-                        SUCCESS
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {activities
+                  .filter(act => {
+                    if (!act.createdAt) return true;
+                    const daysDiff = (new Date().getTime() - new Date(act.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+                    if (tenantSettings.subscriptionPlan === 'FREE') {
+                      return daysDiff <= 7;
+                    }
+                    if (tenantSettings.subscriptionPlan === 'PRO') {
+                      return daysDiff <= 365;
+                    }
+                    return true; // ENTERPRISE
+                  })
+                  .map(act => (
+                    <tr key={act.id}>
+                      <td style={{ fontWeight: '600' }}>⚡ {act.description}</td>
+                      <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{act.timestamp}</td>
+                      <td>
+                        <span className="badge" style={{ background: 'rgba(52, 211, 153, 0.1)', color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.2)' }}>
+                          SUCCESS
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>

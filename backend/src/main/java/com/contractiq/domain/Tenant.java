@@ -38,6 +38,9 @@ public class Tenant {
 
     private String webhookUrl;
 
+    @Column(name = "subscription_plan")
+    private String subscriptionPlan = "FREE";
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
