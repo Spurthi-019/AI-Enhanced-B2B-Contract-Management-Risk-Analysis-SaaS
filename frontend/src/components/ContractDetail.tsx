@@ -119,8 +119,7 @@ export function ContractDetail({
   token,
   BACKEND_URL,
   onUpdateContractStatus,
-  onUpdateReminderThreshold,
-  subscriptionPlan = 'FREE'
+  onUpdateReminderThreshold
 }: ContractDetailProps) {
   const activeVersionObj = selectedContract.versionHistory.find(
     v => v.versionNumber === selectedVersion
@@ -675,19 +674,7 @@ export function ContractDetail({
                   </p>
                 </div>
 
-                {subscriptionPlan === 'FREE' ? (
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '40px 20px', textAlign: 'center' }}>
-                    <span style={{ fontSize: '48px', marginBottom: '15px' }}>🔒</span>
-                    <h3 className="section-title" style={{ fontSize: '16px', marginBottom: '8px', borderLeft: 'none', paddingLeft: 0, color: 'var(--text-primary)' }}>Contract Chat is a Pro Feature</h3>
-                    <p className="sub-title" style={{ fontSize: '13px', maxWidth: '280px', margin: '0 auto 20px', lineHeight: 1.5, color: 'var(--text-muted)' }}>
-                      Ask AI Assistant specific questions, verify clauses, and interact with agreements in real-time.
-                    </p>
-                    <button type="button" className="btn" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', padding: '8px 20px', fontSize: '12px' }} onClick={() => navigate('/billing')}>
-                      💳 Upgrade Workspace Plan
-                    </button>
-                  </div>
-                ) : (
-                  <>
+                <>
                     {/* Chat Messages Stream */}
                     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 15, paddingRight: 5 }}>
                       {(chatMessages[selectedContract.id] || []).length === 0 ? (
@@ -800,7 +787,6 @@ export function ContractDetail({
                       </button>
                     </form>
                   </>
-                )}
               </div>
             )}
           </div>

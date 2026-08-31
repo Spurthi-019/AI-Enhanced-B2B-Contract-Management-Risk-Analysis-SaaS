@@ -51,11 +51,17 @@ public class DbInitializer implements CommandLineRunner {
             tenant = new Tenant();
             tenant.setName("Default SaaS Tenant");
             tenant.setCompanyName("Default SaaS Tenant");
+            tenant.setSubscriptionPlan("PRO");
             tenant.setCreatedAt(LocalDateTime.now());
             tenant = tenantRepository.save(tenant);
-            log.info("Created Default Tenant: {}", tenant.getId());
+            log.info("Created Default Tenant with PRO plan: {}", tenant.getId());
         } else {
             tenant = tenantRepository.findAll().getFirst();
+            if (tenant.getSubscriptionPlan() == null || tenant.getSubscriptionPlan().equals("FREE")) {
+                tenant.setSubscriptionPlan("PRO");
+                tenant = tenantRepository.save(tenant);
+                log.info("Upgraded existing Default Tenant to PRO plan");
+            }
         }
 
         // 2. Create default Roles if they do not exist

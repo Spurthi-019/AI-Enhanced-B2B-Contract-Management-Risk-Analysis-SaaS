@@ -621,14 +621,7 @@ public class ContractController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing tenant context");
         }
 
-        java.util.UUID tenantUuid = java.util.UUID.fromString(tenantId);
-        com.contractiq.domain.Tenant tenant = tenantRepository.findById(tenantUuid)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant workspace not found"));
-        
-        String plan = tenant.getSubscriptionPlan() != null ? tenant.getSubscriptionPlan() : "FREE";
-        if (plan.equals("FREE")) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Contract Chat is not available on the Free plan. Please upgrade to Pro or Enterprise.");
-        }
+
 
         ContractDocument contractDoc = contractDocumentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found"));

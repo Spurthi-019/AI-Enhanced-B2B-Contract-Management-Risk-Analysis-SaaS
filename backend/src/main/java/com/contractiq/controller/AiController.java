@@ -75,15 +75,7 @@ public class AiController {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied to this contract workspace");
             }
 
-            // Verify subscription plan
-            java.util.UUID tenantUuid = java.util.UUID.fromString(tenantId);
-            com.contractiq.domain.Tenant tenant = tenantRepository.findById(tenantUuid)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Tenant workspace not found"));
 
-            String plan = tenant.getSubscriptionPlan() != null ? tenant.getSubscriptionPlan() : "FREE";
-            if (plan.equals("FREE")) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Contract Chat is not available on the Free plan. Please upgrade to Pro or Enterprise.");
-            }
 
             // 1. RAG context query setup: Search top 3 relevant chunks
             List<Document> relevantDocs;
