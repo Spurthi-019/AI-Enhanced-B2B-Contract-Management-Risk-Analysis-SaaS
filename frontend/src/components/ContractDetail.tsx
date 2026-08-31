@@ -149,13 +149,16 @@ export function ContractDetail({
   const canApprove = userRoles.includes('ROLE_ADMIN') || userRoles.includes('ROLE_LEGAL_REVIEWER');
   const isApproved = selectedContract.approvalStatus === 'APPROVED';
 
-  // Derive lifecycle steps
+  // Derive lifecycle steps (5-stage premium workflow matching user requirements)
   const isStep2Completed = activeVersionObj?.analysis ? true : false;
   const isStep3Completed = activeVersionObj?.comments && activeVersionObj.comments.length > 0 ? true : false;
-  const isStep4Completed = isApproved;
+  const isStep4Completed = selectedContract.approvalStatus === 'APPROVED' || selectedContract.approvalStatus === 'ARCHIVED';
+  const isStep5Completed = selectedContract.approvalStatus === 'ARCHIVED';
 
   let stepIndex = 1;
-  if (isStep4Completed) {
+  if (isStep5Completed) {
+    stepIndex = 5;
+  } else if (isStep4Completed) {
     stepIndex = 4;
   } else if (isStep3Completed) {
     stepIndex = 3;
@@ -163,7 +166,7 @@ export function ContractDetail({
     stepIndex = 2;
   }
 
-  const progressPercent = stepIndex === 1 ? 0 : stepIndex === 2 ? 33 : stepIndex === 3 ? 66 : 100;
+  const progressPercent = stepIndex === 1 ? 0 : stepIndex === 2 ? 25 : stepIndex === 3 ? 50 : stepIndex === 4 ? 75 : 100;
 
   // Expiration checking
   const checkIsExpiringSoon = () => {
@@ -233,9 +236,9 @@ export function ContractDetail({
 
             {/* Approval Status Badge */}
             <span className="badge" style={{ 
-              background: selectedContract.approvalStatus === 'APPROVED' ? 'rgba(16, 185, 129, 0.1)' : selectedContract.approvalStatus === 'REJECTED' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)', 
-              color: selectedContract.approvalStatus === 'APPROVED' ? '#34d399' : selectedContract.approvalStatus === 'REJECTED' ? '#f87171' : '#60a5fa', 
-              border: selectedContract.approvalStatus === 'APPROVED' ? '1px solid rgba(16, 185, 129, 0.2)' : selectedContract.approvalStatus === 'REJECTED' ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(59, 130, 246, 0.2)',
+              background: selectedContract.approvalStatus === 'APPROVED' ? 'rgba(16, 185, 129, 0.1)' : selectedContract.approvalStatus === 'REJECTED' ? 'rgba(239, 68, 68, 0.1)' : selectedContract.approvalStatus === 'ARCHIVED' ? 'rgba(148, 163, 184, 0.1)' : 'rgba(59, 130, 246, 0.1)', 
+              color: selectedContract.approvalStatus === 'APPROVED' ? '#34d399' : selectedContract.approvalStatus === 'REJECTED' ? '#f87171' : selectedContract.approvalStatus === 'ARCHIVED' ? '#94a3b8' : '#60a5fa', 
+              border: selectedContract.approvalStatus === 'APPROVED' ? '1px solid rgba(16, 185, 129, 0.2)' : selectedContract.approvalStatus === 'REJECTED' ? '1px solid rgba(239, 68, 68, 0.2)' : selectedContract.approvalStatus === 'ARCHIVED' ? '1px solid rgba(148, 163, 184, 0.2)' : '1px solid rgba(59, 130, 246, 0.2)',
               padding: '4px 10px', 
               fontSize: '12px', 
               whiteSpace: 'nowrap'
@@ -246,7 +249,7 @@ export function ContractDetail({
         </div>
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {canApprove && !isApproved && onUpdateContractStatus && (
+          {canApprove && !isApproved && selectedContract.approvalStatus !== 'ARCHIVED' && onUpdateContractStatus && (
             <div style={{ display: 'flex', gap: '8px', borderRight: '1px solid rgba(255,255,255,0.08)', paddingRight: '12px', marginRight: '2px' }}>
               <button 
                 className="btn" 
@@ -261,6 +264,18 @@ export function ContractDetail({
                 onClick={() => onUpdateContractStatus('REJECTED')}
               >
                 ❌ Request Changes
+              </button>
+            </div>
+          )}
+
+          {canApprove && selectedContract.approvalStatus === 'APPROVED' && onUpdateContractStatus && (
+            <div style={{ display: 'flex', gap: '8px', borderRight: '1px solid rgba(255,255,255,0.08)', paddingRight: '12px', marginRight: '2px' }}>
+              <button 
+                className="btn btn-secondary" 
+                style={{ padding: '8px 14px', fontSize: '13px', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#94a3b8' }}
+                onClick={() => onUpdateContractStatus('ARCHIVED')}
+              >
+                📦 Archive Contract
               </button>
             </div>
           )}
@@ -290,7 +305,7 @@ export function ContractDetail({
           
           <div className={`stepper-step ${stepIndex >= 1 ? (stepIndex === 1 ? 'active' : 'completed') : ''}`}>
             <div className="stepper-bubble">📤</div>
-            <div className="stepper-label">Draft Uploaded</div>
+            <div className="stepper-label">Ingested & Stored</div>
           </div>
           <div className={`stepper-step ${stepIndex >= 2 ? (stepIndex === 2 ? 'active' : 'completed') : ''}`}>
             <div className="stepper-bubble">🤖</div>
@@ -298,11 +313,15 @@ export function ContractDetail({
           </div>
           <div className={`stepper-step ${stepIndex >= 3 ? (stepIndex === 3 ? 'active' : 'completed') : ''}`}>
             <div className="stepper-bubble">👥</div>
-            <div className="stepper-label">Teammate Review</div>
+            <div className="stepper-label">Review & Comments</div>
           </div>
           <div className={`stepper-step ${stepIndex >= 4 ? (stepIndex === 4 ? 'active' : 'completed') : ''}`}>
             <div className="stepper-bubble">✔️</div>
             <div className="stepper-label">Approved & Active</div>
+          </div>
+          <div className={`stepper-step ${stepIndex >= 5 ? (stepIndex === 5 ? 'active' : 'completed') : ''}`}>
+            <div className="stepper-bubble">📦</div>
+            <div className="stepper-label">Archived</div>
           </div>
         </div>
       </div>
@@ -735,9 +754,27 @@ export function ContractDetail({
                       )}
 
                       {isSendingChat && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)', paddingLeft: 5 }}>
-                          <span className="spinner" style={{ width: 14, height: 14 }}></span>
-                          <span>AI is reading contract chunks...</span>
+                        <div 
+                          style={{ 
+                            alignSelf: 'flex-start',
+                            width: '70%',
+                            background: 'var(--bg-canvas)',
+                            padding: '12px 14px',
+                            borderRadius: '16px 16px 16px 2px',
+                            border: '1px solid var(--border-color)',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                            marginBottom: '10px'
+                          }}
+                        >
+                          <div className="skeleton-loader" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '4px 0' }}>
+                            <div className="skeleton-line" style={{ height: '10px', width: '95%' }}></div>
+                            <div className="skeleton-line medium" style={{ height: '10px' }}></div>
+                            <div className="skeleton-line short" style={{ height: '10px' }}></div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+                            <span className="spinner" style={{ width: 10, height: 10 }}></span>
+                            <span>AI is reading contract chunks...</span>
+                          </div>
                         </div>
                       )}
                     </div>

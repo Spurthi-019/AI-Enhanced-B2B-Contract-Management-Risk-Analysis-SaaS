@@ -10,6 +10,7 @@ import com.contractiq.service.ContractAnalysisService;
 import com.contractiq.service.VectorIndexingService;
 import com.contractiq.service.VendorTokenService;
 import com.contractiq.service.EmailNotificationService;
+import com.contractiq.service.PdfParsingService;
 import com.contractiq.dto.ChatRequest;
 import com.contractiq.dto.ChatResponse;
 import io.jsonwebtoken.Claims;
@@ -58,6 +59,7 @@ public class ContractController {
     private final ChatModel chatModel;
     private final VectorStore vectorStore;
     private final com.contractiq.repository.TenantRepository tenantRepository;
+    private final PdfParsingService pdfParsingService;
 
     public ContractController(
             ContractDocumentRepository contractDocumentRepository,
@@ -67,7 +69,8 @@ public class ContractController {
             EmailNotificationService emailNotificationService,
             ChatModel chatModel,
             VectorStore vectorStore,
-            com.contractiq.repository.TenantRepository tenantRepository
+            com.contractiq.repository.TenantRepository tenantRepository,
+            PdfParsingService pdfParsingService
     ) {
         this.contractDocumentRepository = contractDocumentRepository;
         this.vectorIndexingService = vectorIndexingService;
@@ -77,6 +80,7 @@ public class ContractController {
         this.chatModel = chatModel;
         this.vectorStore = vectorStore;
         this.tenantRepository = tenantRepository;
+        this.pdfParsingService = pdfParsingService;
     }
 
     @GetMapping
@@ -153,7 +157,14 @@ public class ContractController {
         
         ContractVersion version1 = new ContractVersion();
         version1.setVersionNumber(1);
-        version1.setFullText("Version 1 uploaded.");
+        String fullText = "";
+        try {
+            fullText = pdfParsingService.parsePdf(targetFilePath);
+        } catch (Exception e) {
+            log.error("Failed to parse PDF content during upload", e);
+            fullText = "Failed to parse PDF content.";
+        }
+        version1.setFullText(fullText);
         version1.setComments(new ArrayList<>());
         version1.setUpdatedAt(LocalDateTime.now());
         
@@ -458,7 +469,14 @@ public class ContractController {
         // Build new version history entry
         ContractVersion versionEntry = new ContractVersion();
         versionEntry.setVersionNumber(nextVersion);
-        versionEntry.setFullText("Version " + nextVersion + " uploaded.");
+        String fullText = "";
+        try {
+            fullText = pdfParsingService.parsePdf(targetFilePath);
+        } catch (Exception e) {
+            log.error("Failed to parse PDF content during revised upload", e);
+            fullText = "Failed to parse PDF content.";
+        }
+        versionEntry.setFullText(fullText);
         versionEntry.setComments(new ArrayList<>());
         versionEntry.setAnalysis(analysis);
         versionEntry.setUpdatedAt(LocalDateTime.now());
@@ -691,7 +709,7 @@ public class ContractController {
         }
 
         // Validate status value
-        if (!List.of("DRAFT", "PENDING_APPROVAL", "APPROVED", "REJECTED").contains(status)) {
+        if (!List.of("DRAFT", "PENDING_APPROVAL", "APPROVED", "REJECTED", "ARCHIVED").contains(status)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid status value");
         }
 

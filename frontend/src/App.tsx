@@ -643,13 +643,13 @@ function App() {
     });
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/v1/contracts/${contractId}/chat`, {
+      const res = await fetch(`${BACKEND_URL}/api/ai/chat`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ question: userMessage })
+        body: JSON.stringify({ question: userMessage, contractId })
       });
 
       if (res.ok) {
@@ -1789,9 +1789,9 @@ function App() {
                                 </td>
                                 <td style={{ verticalAlign: 'middle', padding: '12px 16px' }}>
                                   <span className="badge" style={{ 
-                                    background: doc.approvalStatus === 'APPROVED' ? '#10b981' : doc.approvalStatus === 'REJECTED' ? '#ef4444' : '#3b82f6', 
+                                    background: doc.approvalStatus === 'APPROVED' ? '#10b981' : doc.approvalStatus === 'REJECTED' ? '#ef4444' : doc.approvalStatus === 'ARCHIVED' ? '#64748b' : '#3b82f6', 
                                     color: '#ffffff', 
-                                    border: doc.approvalStatus === 'APPROVED' ? '1px solid #059669' : doc.approvalStatus === 'REJECTED' ? '1px solid #dc2626' : '1px solid #2563eb',
+                                    border: doc.approvalStatus === 'APPROVED' ? '1px solid #059669' : doc.approvalStatus === 'REJECTED' ? '1px solid #dc2626' : doc.approvalStatus === 'ARCHIVED' ? '1px solid #475569' : '1px solid #2563eb',
                                     fontWeight: '600'
                                   }}>
                                     {doc.approvalStatus || 'PENDING_APPROVAL'}
