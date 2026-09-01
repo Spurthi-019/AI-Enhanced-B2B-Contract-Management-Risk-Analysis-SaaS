@@ -53,11 +53,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
         try {
-            userId = jwtService.extractUserId(jwt);
-            tenantId = jwtService.extractTenantId(jwt);
+            if (jwtService.isTokenValid(jwt)) {
+                userId = jwtService.extractUserId(jwt);
+                tenantId = jwtService.extractTenantId(jwt);
 
-            if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                if (jwtService.isTokenValid(jwt)) {
+                if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     List<String> roles = jwtService.extractRoles(jwt);
                     List<SimpleGrantedAuthority> authorities = roles != null
                             ? roles.stream().map(SimpleGrantedAuthority::new).collect(Collectors.toList())
@@ -75,8 +75,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     TenantContext.setTenantId(tenantId);
                 }
             }
-
             filterChain.doFilter(request, response);
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            logger.warn("JWT token has expired: " + e.getMessage());
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\": \"Unauthorized\", \"message\": \"JWT token has expired. Please log in again.\"}");
+        } catch (io.jsonwebtoken.JwtException e) {
+            logger.warn("Invalid JWT token: " + e.getMessage());
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\": \"Unauthorized\", \"message\": \"Invalid JWT token.\"}");
         } finally {
             // Crucial: Clear tenant context thread-local variable to prevent pool leakage
             TenantContext.clear();

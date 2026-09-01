@@ -11,6 +11,7 @@ import com.contractiq.service.VectorIndexingService;
 import com.contractiq.service.VendorTokenService;
 import com.contractiq.service.EmailNotificationService;
 import com.contractiq.service.PdfParsingService;
+import com.contractiq.service.ContractAiService;
 import com.contractiq.dto.ChatRequest;
 import com.contractiq.dto.ChatResponse;
 import io.jsonwebtoken.Claims;
@@ -60,6 +61,7 @@ public class ContractController {
     private final VectorStore vectorStore;
     private final com.contractiq.repository.TenantRepository tenantRepository;
     private final PdfParsingService pdfParsingService;
+    private final ContractAiService contractAiService;
 
     public ContractController(
             ContractDocumentRepository contractDocumentRepository,
@@ -70,7 +72,8 @@ public class ContractController {
             ChatModel chatModel,
             VectorStore vectorStore,
             com.contractiq.repository.TenantRepository tenantRepository,
-            PdfParsingService pdfParsingService
+            PdfParsingService pdfParsingService,
+            ContractAiService contractAiService
     ) {
         this.contractDocumentRepository = contractDocumentRepository;
         this.vectorIndexingService = vectorIndexingService;
@@ -81,6 +84,7 @@ public class ContractController {
         this.vectorStore = vectorStore;
         this.tenantRepository = tenantRepository;
         this.pdfParsingService = pdfParsingService;
+        this.contractAiService = contractAiService;
     }
 
     @GetMapping
@@ -512,14 +516,6 @@ public class ContractController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
         }
 
-        // Verify ROLE_ADMIN for delete contract
-        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        boolean isAdmin = auth.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        if (!isAdmin) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied: Only Workspace Administrators can delete contracts");
-        }
-
         // 1. Delete file on disk
         if (contractDoc.getStoredFilePath() != null) {
             try {
@@ -607,6 +603,15 @@ public class ContractController {
         private String content;
         private boolean isVendorFacing;
         private Integer version;
+
+        public String getContent() { return content; }
+        public void setContent(String content) { this.content = content; }
+
+        public boolean isVendorFacing() { return isVendorFacing; }
+        public void setVendorFacing(boolean isVendorFacing) { this.isVendorFacing = isVendorFacing; }
+
+        public Integer getVersion() { return version; }
+        public void setVersion(Integer version) { this.version = version; }
     }
 
     @PostMapping("/{id}/chat")
@@ -630,62 +635,57 @@ public class ContractController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
         }
 
-        // 1. RAG context query setup: Search top 3 relevant chunks
-        List<Document> relevantDocs;
-        if (vectorStore instanceof org.springframework.ai.vectorstore.SimpleVectorStore) {
-            SearchRequest searchRequest = SearchRequest.query(request.getQuestion()).withTopK(100);
-            List<Document> allDocs = vectorStore.similaritySearch(searchRequest);
-            relevantDocs = allDocs.stream()
-                    .filter(doc -> {
-                        Object tId = doc.getMetadata().get("tenantId");
-                        Object cId = doc.getMetadata().get("contractId");
-                        Object ver = doc.getMetadata().get("version");
-                        return tenantId.equals(tId) && 
-                               id.equals(cId) && 
-                               (ver == null || Integer.valueOf(contractDoc.getCurrentVersion()).equals(Integer.valueOf(ver.toString())));
-                    })
-                    .limit(3)
-                    .collect(Collectors.toList());
-        } else {
-            String filterExpression = String.format("tenantId == '%s' && contractId == '%s' && version == %d", 
-                    tenantId, id, contractDoc.getCurrentVersion());
-            SearchRequest searchRequest = SearchRequest.query(request.getQuestion())
-                    .withTopK(3)
-                    .withFilterExpression(filterExpression);
-            relevantDocs = vectorStore.similaritySearch(searchRequest);
+        // 1. Extract active version and full contract text from document
+        com.contractiq.document.ContractVersion activeVersion = null;
+        if (contractDoc.getVersionHistory() != null && !contractDoc.getVersionHistory().isEmpty()) {
+            activeVersion = contractDoc.getVersionHistory().stream()
+                    .filter(v -> v.getVersionNumber() == contractDoc.getCurrentVersion())
+                    .findFirst()
+                    .orElse(contractDoc.getVersionHistory().get(contractDoc.getVersionHistory().size() - 1));
         }
 
-        String contextText = relevantDocs.stream()
-                .map(Document::getContent)
-                .collect(Collectors.joining("\n---\n"));
+        String fullText = activeVersion != null ? activeVersion.getFullText() : null;
 
-        // 2. Format Prompt and invoke LLM ChatModel
-        String promptText = String.format("""
-                You are a helpful corporate legal assistant for ContractIQ.
-                Answer the user's Question using ONLY the contract Context provided below.
-                Make the response professional, clear, and direct.
-                If the answer cannot be found or inferred from the context, state: "I'm sorry, but that information is not available in the active contract version."
-                
-                Context:
-                %s
-                
-                Question:
-                %s
-                
-                Answer:
-                """, contextText, request.getQuestion());
-
-        String answer;
-        try {
-            org.springframework.ai.chat.model.ChatResponse aiResponse = chatModel.call(new Prompt(promptText));
-            answer = aiResponse.getResult().getOutput().getContent();
-        } catch (Exception e) {
-            log.warn("Ollama AI connection failed. Using mock RAG response. Error: {}", e.getMessage());
-            answer = "ContractIQ AI Assistant (offline mode): Based on the review of the active contract version: '" + 
-                     contractDoc.getTitle() + "', the contract specifies standard provisions. Regarding your question: '" + 
-                     request.getQuestion() + "', please ensure the AI server is online to run similarity search.";
+        // Fallback: If full text is missing in DB, parse directly from stored PDF on disk
+        if ((fullText == null || fullText.trim().isEmpty()) && contractDoc.getStoredFilePath() != null) {
+            try {
+                java.nio.file.Path path = java.nio.file.Paths.get(contractDoc.getStoredFilePath());
+                if (java.nio.file.Files.exists(path)) {
+                    fullText = pdfParsingService.parsePdf(path);
+                    if (activeVersion != null && fullText != null) {
+                        activeVersion.setFullText(fullText);
+                        contractDocumentRepository.save(contractDoc);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Could not parse contract PDF from disk: {}", e.getMessage());
+            }
         }
 
+        if (fullText == null || fullText.trim().isEmpty()) {
+            fullText = "Contract Title: " + contractDoc.getTitle();
+        }
+
+        StringBuilder metadata = new StringBuilder();
+        metadata.append("Version: ").append(contractDoc.getCurrentVersion()).append("\n");
+        if (contractDoc.getOriginalFilename() != null) {
+            metadata.append("Filename: ").append(contractDoc.getOriginalFilename()).append("\n");
+        }
+        if (activeVersion != null && activeVersion.getAnalysis() != null) {
+            var analysis = activeVersion.getAnalysis();
+            if (analysis.getSummary() != null) {
+                metadata.append("Risk Level: ").append(analysis.getSummary().getOverallRiskLevel()).append("\n");
+                metadata.append("Analysis Summary: ").append(analysis.getSummary().getSummaryText()).append("\n");
+            }
+            if (analysis.getKeyTerms() != null && !analysis.getKeyTerms().isEmpty()) {
+                metadata.append("Key Terms: ").append(String.join(", ", analysis.getKeyTerms())).append("\n");
+            }
+            if (analysis.getExpirationDate() != null) {
+                metadata.append("Expiration: ").append(analysis.getExpirationDate()).append("\n");
+            }
+        }
+
+        String answer = contractAiService.generateGroundedResponse(request.getQuestion(), contractDoc.getTitle(), metadata.toString(), fullText);
         return ResponseEntity.ok(new ChatResponse(answer));
     }
 

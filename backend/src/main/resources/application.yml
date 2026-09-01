@@ -52,7 +52,7 @@ server:
 security:
   jwt:
     secret: your_secure_base64_jwt_signing_key_here_must_be_at_least_256_bits
-    expiration-ms: 86400000
+    expiration-ms: 604800000
 
 logging:
   level:

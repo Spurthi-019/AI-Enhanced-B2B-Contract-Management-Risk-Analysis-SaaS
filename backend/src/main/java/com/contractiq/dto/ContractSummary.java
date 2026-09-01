@@ -10,4 +10,10 @@ import lombok.NoArgsConstructor;
 public class ContractSummary {
     private String summaryText;
     private String overallRiskLevel;
+
+    public String getSummaryText() { return summaryText; }
+    public void setSummaryText(String summaryText) { this.summaryText = summaryText; }
+
+    public String getOverallRiskLevel() { return overallRiskLevel; }
+    public void setOverallRiskLevel(String overallRiskLevel) { this.overallRiskLevel = overallRiskLevel; }
 }

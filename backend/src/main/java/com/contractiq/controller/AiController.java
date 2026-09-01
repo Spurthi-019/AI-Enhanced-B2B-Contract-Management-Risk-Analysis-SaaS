@@ -31,17 +31,20 @@ public class AiController {
     private final ContractDocumentRepository contractDocumentRepository;
     private final VectorStore vectorStore;
     private final com.contractiq.repository.TenantRepository tenantRepository;
+    private final com.contractiq.service.PdfParsingService pdfParsingService;
 
     public AiController(
             ContractAiService contractAiService,
             ContractDocumentRepository contractDocumentRepository,
             VectorStore vectorStore,
-            com.contractiq.repository.TenantRepository tenantRepository
+            com.contractiq.repository.TenantRepository tenantRepository,
+            com.contractiq.service.PdfParsingService pdfParsingService
     ) {
         this.contractAiService = contractAiService;
         this.contractDocumentRepository = contractDocumentRepository;
         this.vectorStore = vectorStore;
         this.tenantRepository = tenantRepository;
+        this.pdfParsingService = pdfParsingService;
     }
 
     @PostMapping("/chat")
@@ -75,54 +78,58 @@ public class AiController {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied to this contract workspace");
             }
 
-
-
-            // 1. RAG context query setup: Search top 3 relevant chunks
-            List<Document> relevantDocs;
-            if (vectorStore instanceof org.springframework.ai.vectorstore.SimpleVectorStore) {
-                SearchRequest searchRequest = SearchRequest.query(question).withTopK(100);
-                List<Document> allDocs = vectorStore.similaritySearch(searchRequest);
-                relevantDocs = allDocs.stream()
-                        .filter(doc -> {
-                            Object tId = doc.getMetadata().get("tenantId");
-                            Object cId = doc.getMetadata().get("contractId");
-                            Object ver = doc.getMetadata().get("version");
-                            return tenantId.equals(tId) && 
-                                   contractId.equals(cId) && 
-                                   (ver == null || Integer.valueOf(contractDoc.getCurrentVersion()).equals(Integer.valueOf(ver.toString())));
-                        })
-                        .limit(3)
-                        .collect(Collectors.toList());
-            } else {
-                String filterExpression = String.format("tenantId == '%s' && contractId == '%s' && version == %d", 
-                        tenantId, contractId, contractDoc.getCurrentVersion());
-                SearchRequest searchRequest = SearchRequest.query(question)
-                        .withTopK(3)
-                        .withFilterExpression(filterExpression);
-                relevantDocs = vectorStore.similaritySearch(searchRequest);
+            // 1. Extract active version and full contract text from document
+            com.contractiq.document.ContractVersion activeVersion = null;
+            if (contractDoc.getVersionHistory() != null && !contractDoc.getVersionHistory().isEmpty()) {
+                activeVersion = contractDoc.getVersionHistory().stream()
+                        .filter(v -> v.getVersionNumber() == contractDoc.getCurrentVersion())
+                        .findFirst()
+                        .orElse(contractDoc.getVersionHistory().get(contractDoc.getVersionHistory().size() - 1));
             }
 
-            String contextText = relevantDocs.stream()
-                    .map(Document::getContent)
-                    .collect(Collectors.joining("\n---\n"));
+            String fullText = activeVersion != null ? activeVersion.getFullText() : null;
 
-            // Format Prompt
-            String promptText = String.format("""
-                    You are a helpful corporate legal assistant for ContractIQ.
-                    Answer the user's Question using ONLY the contract Context provided below.
-                    Make the response professional, clear, and direct.
-                    If the answer cannot be found or inferred from the context, state: "I'm sorry, but that information is not available in the active contract version."
-                    
-                    Context:
-                    %s
-                    
-                    Question:
-                    %s
-                    
-                    Answer:
-                    """, contextText, question);
+            // Fallback: If full text is missing in DB, parse directly from stored PDF on disk
+            if ((fullText == null || fullText.trim().isEmpty()) && contractDoc.getStoredFilePath() != null) {
+                try {
+                    java.nio.file.Path path = java.nio.file.Paths.get(contractDoc.getStoredFilePath());
+                    if (java.nio.file.Files.exists(path)) {
+                        fullText = pdfParsingService.parsePdf(path);
+                        if (activeVersion != null && fullText != null) {
+                            activeVersion.setFullText(fullText);
+                            contractDocumentRepository.save(contractDoc);
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("Could not parse contract PDF from disk: {}", e.getMessage());
+                }
+            }
 
-            answer = contractAiService.generateResponse(promptText);
+            if (fullText == null || fullText.trim().isEmpty()) {
+                fullText = "Contract Title: " + contractDoc.getTitle();
+            }
+
+            // 2. Build metadata string
+            StringBuilder metadata = new StringBuilder();
+            metadata.append("Version: ").append(contractDoc.getCurrentVersion()).append("\n");
+            if (contractDoc.getOriginalFilename() != null) {
+                metadata.append("Filename: ").append(contractDoc.getOriginalFilename()).append("\n");
+            }
+            if (activeVersion != null && activeVersion.getAnalysis() != null) {
+                var analysis = activeVersion.getAnalysis();
+                if (analysis.getSummary() != null) {
+                    metadata.append("Risk Level: ").append(analysis.getSummary().getOverallRiskLevel()).append("\n");
+                    metadata.append("Analysis Summary: ").append(analysis.getSummary().getSummaryText()).append("\n");
+                }
+                if (analysis.getKeyTerms() != null && !analysis.getKeyTerms().isEmpty()) {
+                    metadata.append("Key Terms: ").append(String.join(", ", analysis.getKeyTerms())).append("\n");
+                }
+                if (analysis.getExpirationDate() != null) {
+                    metadata.append("Expiration: ").append(analysis.getExpirationDate()).append("\n");
+                }
+            }
+
+            answer = contractAiService.generateGroundedResponse(question, contractDoc.getTitle(), metadata.toString(), fullText);
         } else {
             // General prompt fallback
             answer = contractAiService.generateResponse(question);
@@ -138,5 +145,14 @@ public class AiController {
         private String question;
         private String prompt;
         private String contractId;
+
+        public String getQuestion() { return question; }
+        public void setQuestion(String question) { this.question = question; }
+
+        public String getPrompt() { return prompt; }
+        public void setPrompt(String prompt) { this.prompt = prompt; }
+
+        public String getContractId() { return contractId; }
+        public void setContractId(String contractId) { this.contractId = contractId; }
     }
 }

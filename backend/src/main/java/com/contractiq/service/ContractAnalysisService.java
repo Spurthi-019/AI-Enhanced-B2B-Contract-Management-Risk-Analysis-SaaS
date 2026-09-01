@@ -1,6 +1,9 @@
 package com.contractiq.service;
 
+import com.contractiq.document.ContractDocument;
+import com.contractiq.document.ContractVersion;
 import com.contractiq.dto.ContractAnalysisResponse;
+import com.contractiq.repository.ContractDocumentRepository;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -23,46 +26,85 @@ public class ContractAnalysisService {
 
     private final ChatModel chatModel;
     private final VectorStore vectorStore;
+    private final ContractDocumentRepository contractDocumentRepository;
+    private final PdfParsingService pdfParsingService;
 
-    public ContractAnalysisService(ChatModel chatModel, VectorStore vectorStore) {
+    public ContractAnalysisService(
+            ChatModel chatModel,
+            VectorStore vectorStore,
+            ContractDocumentRepository contractDocumentRepository,
+            PdfParsingService pdfParsingService
+    ) {
         this.chatModel = chatModel;
         this.vectorStore = vectorStore;
+        this.contractDocumentRepository = contractDocumentRepository;
+        this.pdfParsingService = pdfParsingService;
     }
 
     public ContractAnalysisResponse analyzeContract(String contractId, String tenantId, int versionNumber) {
         log.info("Starting risk analysis for contract: {} (version: {}) under tenant: {}", contractId, versionNumber, tenantId);
 
         // 1. Query vector database for relevant contract chunks (RAG context)
-        // We filter by tenantId, contractId, and version metadata for strict version isolation.
-        List<Document> relevantDocs;
-        if (vectorStore instanceof org.springframework.ai.vectorstore.SimpleVectorStore) {
-            log.info("Using SimpleVectorStore in-memory metadata filtering fallback");
-            SearchRequest searchRequest = SearchRequest.query("liabilities indemnities termination warranty risk")
-                    .withTopK(100);
-            List<Document> allDocs = vectorStore.similaritySearch(searchRequest);
-            relevantDocs = allDocs.stream()
-                    .filter(doc -> {
-                        Object tId = doc.getMetadata().get("tenantId");
-                        Object cId = doc.getMetadata().get("contractId");
-                        Object ver = doc.getMetadata().get("version");
-                        return tenantId.equals(tId) && 
-                               contractId.equals(cId) && 
-                               (ver == null || Integer.valueOf(versionNumber).equals(Integer.valueOf(ver.toString())));
-                    })
-                    .limit(8)
-                    .collect(Collectors.toList());
-        } else {
-            String filterExpression = String.format("tenantId == '%s' && contractId == '%s' && version == %d", tenantId, contractId, versionNumber);
-            SearchRequest searchRequest = SearchRequest.query("liabilities indemnities termination warranty risk")
-                    .withTopK(8)
-                    .withFilterExpression(filterExpression);
-            relevantDocs = vectorStore.similaritySearch(searchRequest);
+        List<Document> relevantDocs = new java.util.ArrayList<>();
+        try {
+            if (vectorStore instanceof org.springframework.ai.vectorstore.SimpleVectorStore) {
+                log.info("Using SimpleVectorStore in-memory metadata filtering fallback");
+                SearchRequest searchRequest = SearchRequest.query("liabilities indemnities termination warranty risk")
+                        .withTopK(100);
+                List<Document> allDocs = vectorStore.similaritySearch(searchRequest);
+                relevantDocs = allDocs.stream()
+                        .filter(doc -> {
+                            Object tId = doc.getMetadata().get("tenantId");
+                            Object cId = doc.getMetadata().get("contractId");
+                            Object ver = doc.getMetadata().get("version");
+                            return tenantId.equals(tId) && 
+                                   contractId.equals(cId) && 
+                                   (ver == null || Integer.valueOf(versionNumber).equals(Integer.valueOf(ver.toString())));
+                        })
+                        .limit(8)
+                        .collect(Collectors.toList());
+            } else {
+                String filterExpression = String.format("tenantId == '%s' && contractId == '%s' && version == %d", tenantId, contractId, versionNumber);
+                SearchRequest searchRequest = SearchRequest.query("liabilities indemnities termination warranty risk")
+                        .withTopK(8)
+                        .withFilterExpression(filterExpression);
+                relevantDocs = vectorStore.similaritySearch(searchRequest);
+            }
+        } catch (Exception e) {
+            log.warn("Vector Store similarity search failed: {}. Falling back to document text context.", e.getMessage());
         }
-        log.info("Retrieved {} relevant text chunks", relevantDocs.size());
+        log.info("Retrieved {} relevant text chunks from vector store", relevantDocs.size());
 
         String contextText = relevantDocs.stream()
                 .map(Document::getContent)
                 .collect(Collectors.joining("\n---\n"));
+
+        // Fallback: If vector store returned empty or failed, load full text from MongoDB document or PDF disk
+        if (contextText == null || contextText.trim().isEmpty()) {
+            try {
+                ContractDocument doc = contractDocumentRepository.findById(contractId).orElse(null);
+                if (doc != null) {
+                    ContractVersion activeVer = null;
+                    if (doc.getVersionHistory() != null && !doc.getVersionHistory().isEmpty()) {
+                        activeVer = doc.getVersionHistory().stream()
+                                .filter(v -> v.getVersionNumber() == versionNumber)
+                                .findFirst()
+                                .orElse(doc.getVersionHistory().get(doc.getVersionHistory().size() - 1));
+                    }
+                    if (activeVer != null && activeVer.getFullText() != null && !activeVer.getFullText().trim().isEmpty()) {
+                        contextText = activeVer.getFullText();
+                    } else if (doc.getStoredFilePath() != null) {
+                        contextText = pdfParsingService.parsePdf(java.nio.file.Paths.get(doc.getStoredFilePath()));
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("Could not retrieve full text fallback from contract document: {}", ex.getMessage());
+            }
+        }
+
+        if (contextText == null) {
+            contextText = "";
+        }
 
         // 2. Setup BeanOutputConverter for structured JSON response
         BeanOutputConverter<ContractAnalysisResponse> converter = 

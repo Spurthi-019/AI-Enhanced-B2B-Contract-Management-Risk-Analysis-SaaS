@@ -398,9 +398,19 @@ function App() {
         // Auto trigger analysis
         triggerAnalysis(doc.id, doc.title);
         navigate('/contracts');
+      } else if (res.status === 401) {
+        showToast('Session expired. Please log in again.');
+        handleLogout();
       } else {
-        const errText = await res.text();
-        showToast(`Upload failed: ${errText}`);
+        let errMessage = 'Upload failed. Please check file format.';
+        try {
+          const errJson = await res.json();
+          errMessage = errJson.message || errJson.error || 'Server error';
+        } catch {
+          const raw = await res.text();
+          if (raw) errMessage = raw;
+        }
+        showToast(`Upload failed: ${errMessage}`);
       }
     } catch (err) {
       showToast('Network error during file upload');
@@ -642,6 +652,9 @@ function App() {
       };
     });
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
+
     try {
       const res = await fetch(`${BACKEND_URL}/api/ai/chat`, {
         method: 'POST',
@@ -649,8 +662,10 @@ function App() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ question: userMessage, contractId })
+        body: JSON.stringify({ question: userMessage, contractId }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       if (res.ok) {
         const data = await res.json();
@@ -671,13 +686,20 @@ function App() {
           };
         });
       }
-    } catch (err) {
-      showToast('Network error during AI chat request');
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      const isTimeout = err?.name === 'AbortError';
+      showToast(isTimeout ? 'AI response timed out' : 'Network error during AI chat request');
       setChatMessages(prev => {
         const currentList = prev[contractId] || [];
         return {
           ...prev,
-          [contractId]: [...currentList, { sender: 'ai', text: 'Network error communicating with ContractIQ AI.' }]
+          [contractId]: [...currentList, { 
+            sender: 'ai', 
+            text: isTimeout 
+              ? 'Request timed out waiting for the local model. Please try again.' 
+              : 'Network error communicating with ContractIQ AI.' 
+          }]
         };
       });
     } finally {
@@ -1806,15 +1828,13 @@ function App() {
                                     >
                                       Inspect
                                     </button>
-                                    {isAdmin && (
-                                      <button 
-                                        className="btn btn-danger" 
-                                        style={{ padding: '6px 12px', fontSize: '11px', whiteSpace: 'nowrap' }} 
-                                        onClick={() => handleDeleteContract(doc.id)}
-                                      >
-                                        Delete
-                                      </button>
-                                    )}
+                                    <button 
+                                      className="btn btn-danger" 
+                                      style={{ padding: '6px 12px', fontSize: '11px', whiteSpace: 'nowrap' }} 
+                                      onClick={() => handleDeleteContract(doc.id)}
+                                    >
+                                      Delete
+                                    </button>
                                   </div>
                                 </td>
                               </tr>

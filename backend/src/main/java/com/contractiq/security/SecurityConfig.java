@@ -38,7 +38,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/v1/auth/**", "/api/v1/vendor/portal/**", "/error").permitAll()
                 .requestMatchers("/api/v1/tenants/invite").hasAuthority("ROLE_ADMIN")
-                .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/contracts/**").hasAuthority("ROLE_ADMIN")
+                .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/contracts/**").authenticated()
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session

@@ -14,6 +14,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
+import com.contractiq.service.ContractAiService;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,9 +29,28 @@ public class MockAiConfig {
             @Override
             public ChatResponse call(Prompt prompt) {
                 String promptText = prompt.getContents();
-                if (promptText.contains("legal assistant")) {
-                    String mockAnswer = "ContractIQ AI Assistant (mock RAG): Based on the review of the active contract version, the payment terms specify that all invoices are due Net 30 from receipt. Uncapped liability applies to data breaches under Section 5.";
-                    return new ChatResponse(List.of(new Generation(mockAnswer)));
+                if (promptText.contains("USER QUESTION") || promptText.contains("legal assistant") || promptText.contains("Question:")) {
+                    // Extract question and context from promptText
+                    String question = "What are the terms of this contract?";
+                    String context = promptText;
+                    
+                    if (promptText.contains("--- USER QUESTION ---")) {
+                        String[] parts = promptText.split("--- USER QUESTION ---");
+                        if (parts.length > 1) {
+                            String qPart = parts[1].split("--- ANSWER ---")[0].trim();
+                            if (!qPart.isEmpty()) question = qPart;
+                        }
+                    } else if (promptText.contains("Question:")) {
+                        String[] parts = promptText.split("Question:");
+                        if (parts.length > 1) {
+                            String qPart = parts[1].split("Answer:")[0].trim();
+                            if (!qPart.isEmpty()) question = qPart;
+                        }
+                    }
+                    
+                    ContractAiService semanticEngine = new ContractAiService(null);
+                    String answer = semanticEngine.extractGroundedAnswer(question, "Contract Document", "", context);
+                    return new ChatResponse(List.of(new Generation(answer)));
                 }
 
                 // Mock a valid legal risk analysis JSON response matching our DTOs
