@@ -196,8 +196,23 @@ export function ContractDetail({
     }, 50);
   };
 
+  const isArchived = selectedContract.approvalStatus === 'ARCHIVED';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Read-Only Mode Banner for Archived Contracts */}
+      {isArchived && (
+        <div className="glass-card" style={{ background: 'rgba(100, 116, 139, 0.12)', border: '1px solid rgba(148, 163, 184, 0.25)', padding: '14px 20px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '14px', marginBottom: 0 }}>
+          <span style={{ fontSize: '24px' }}>📦</span>
+          <div>
+            <h4 style={{ color: '#cbd5e1', fontSize: '14px', margin: 0, fontWeight: '700' }}>Archived Contract — Read-Only Mode</h4>
+            <p style={{ color: '#94a3b8', fontSize: '12px', margin: '4px 0 0 0', lineHeight: 1.4 }}>
+              This contract is archived. PDF preview, AI Risk analysis scores, and AI Chat remain active, while adding new comments and creating vendor magic links are disabled.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* 1. Re-architected Top Banner & Header Bar */}
       <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', padding: '16px 24px', marginBottom: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
@@ -248,7 +263,7 @@ export function ContractDetail({
         </div>
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {canApprove && !isApproved && selectedContract.approvalStatus !== 'ARCHIVED' && onUpdateContractStatus && (
+          {canApprove && !isApproved && !isArchived && onUpdateContractStatus && (
             <div style={{ display: 'flex', gap: '8px', borderRight: '1px solid rgba(255,255,255,0.08)', paddingRight: '12px', marginRight: '2px' }}>
               <button 
                 className="btn" 
@@ -267,7 +282,7 @@ export function ContractDetail({
             </div>
           )}
 
-          {canApprove && selectedContract.approvalStatus === 'APPROVED' && onUpdateContractStatus && (
+          {canApprove && !isArchived && onUpdateContractStatus && (
             <div style={{ display: 'flex', gap: '8px', borderRight: '1px solid rgba(255,255,255,0.08)', paddingRight: '12px', marginRight: '2px' }}>
               <button 
                 className="btn btn-secondary" 
@@ -279,10 +294,24 @@ export function ContractDetail({
             </div>
           )}
 
+          {canApprove && isArchived && onUpdateContractStatus && (
+            <div style={{ display: 'flex', gap: '8px', borderRight: '1px solid rgba(255,255,255,0.08)', paddingRight: '12px', marginRight: '2px' }}>
+              <button 
+                className="btn btn-secondary" 
+                style={{ padding: '8px 14px', fontSize: '13px', border: '1px solid rgba(16, 185, 129, 0.4)', color: '#34d399' }}
+                onClick={() => onUpdateContractStatus('ACTIVE')}
+              >
+                📂 Unarchive Contract
+              </button>
+            </div>
+          )}
+
           <button 
             className="btn" 
-            style={{ padding: '8px 16px', fontSize: '13px', background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)' }}
-            onClick={() => setShowShareModal(true)}
+            style={{ padding: '8px 16px', fontSize: '13px', background: isArchived ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)', opacity: isArchived ? 0.5 : 1, cursor: isArchived ? 'not-allowed' : 'pointer' }}
+            onClick={() => !isArchived && setShowShareModal(true)}
+            disabled={isArchived}
+            title={isArchived ? "Vendor magic link creation disabled for archived contracts" : ""}
           >
             ✉️ Share with Vendor
           </button>
@@ -877,27 +906,39 @@ export function ContractDetail({
             </div>
 
             {/* Bottom Sticky Input Section */}
-            <form onSubmit={handlePostComment} style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 15 }}>
+            <form onSubmit={(e) => { if (isArchived) { e.preventDefault(); return; } handlePostComment(e); }} style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 15 }}>
+              {isArchived && (
+                <div style={{ fontSize: '11px', color: '#94a3b8', background: 'rgba(255,255,255,0.03)', padding: '6px 10px', borderRadius: '6px', marginBottom: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  🔒 Commenting disabled for archived contracts (Read-Only Mode)
+                </div>
+              )}
               <textarea 
                 className="input-field" 
-                placeholder={`Add a note to version ${selectedVersion}...`}
+                placeholder={isArchived ? "Commenting is disabled for archived contracts (Read-Only Mode)." : `Add a note to version ${selectedVersion}...`}
                 value={commentContent}
                 onChange={(e) => setCommentContent(e.target.value)}
-                style={{ width: '100%', boxSizing: 'border-box', height: 80, padding: 10, fontSize: 13, marginBottom: 12, resize: 'none' }}
-                required
+                disabled={isArchived}
+                style={{ width: '100%', boxSizing: 'border-box', height: 80, padding: 10, fontSize: 13, marginBottom: 12, resize: 'none', opacity: isArchived ? 0.5 : 1, cursor: isArchived ? 'not-allowed' : 'text' }}
+                required={!isArchived}
               />
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#cbd5e1', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: isArchived ? '#64748b' : '#cbd5e1', cursor: isArchived ? 'not-allowed' : 'pointer' }}>
                   <input 
                     type="checkbox" 
                     checked={isVendorFacing} 
+                    disabled={isArchived}
                     onChange={(e) => setIsVendorFacing(e.target.checked)} 
                   />
                   Share with Vendor Portal (Public)
                 </label>
-                <button type="submit" className="btn" style={{ width: '100%', padding: '10px', background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)' }}>
-                  Post Comment
+                <button 
+                  type="submit" 
+                  className="btn" 
+                  disabled={isArchived}
+                  style={{ width: '100%', padding: '10px', background: isArchived ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)', opacity: isArchived ? 0.5 : 1, cursor: isArchived ? 'not-allowed' : 'pointer' }}
+                >
+                  {isArchived ? 'Read-Only Mode' : 'Post Comment'}
                 </button>
               </div>
             </form>

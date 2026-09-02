@@ -223,6 +223,10 @@ function App() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('EMPLOYEE');
 
+  // Contract Status & Archiving States
+  const [statusTab, setStatusTab] = useState<'ACTIVE' | 'ARCHIVED' | 'ALL'>('ACTIVE');
+  const [archiveConfirmModalDoc, setArchiveConfirmModalDoc] = useState<any>(null);
+
   // RAG Chat States
   const [rightPanelTab, setRightPanelTab] = useState<'risk' | 'chat'>('risk');
   const [chatMessages, setChatMessages] = useState<{[key: string]: { sender: 'user' | 'ai', text: string }[]}>({});
@@ -444,26 +448,37 @@ function App() {
     }
   };
 
-  // Update contract status
-  const handleUpdateContractStatus = async (status: string) => {
-    if (!selectedContract) return;
+  // Update contract status (e.g. APPROVED, REJECTED, ARCHIVED, ACTIVE)
+  const handleUpdateContractStatus = async (status: string, targetDocId?: string) => {
+    const docId = targetDocId || selectedContract?.id;
+    if (!docId) return;
     try {
-      const res = await fetch(`${BACKEND_URL}/api/v1/contracts/${selectedContract.id}/status?status=${status}`, {
-        method: 'PUT',
+      let res = await fetch(`${BACKEND_URL}/api/v1/contracts/${docId}/status?status=${status}`, {
+        method: 'PATCH',
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      if (!res.ok) {
+        res = await fetch(`${BACKEND_URL}/api/v1/contracts/${docId}/status?status=${status}`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
       if (res.ok) {
         const updated = await res.json();
         setContracts(prev => prev.map(c => c.id === updated.id ? updated : c));
-        setSelectedContract(updated);
-        showToast(`Contract approval status updated to ${status}`);
-        addActivity(`Updated contract "${updated.title}" approval status to ${status}.`);
+        if (selectedContract && selectedContract.id === updated.id) {
+          setSelectedContract(updated);
+        }
+        showToast(`Contract status updated to ${status}`);
+        addActivity(`Updated contract "${updated.title}" status to ${status}.`);
       } else {
         const err = await res.text();
         showToast(`Failed to update status: ${err}`);
       }
     } catch (err) {
       showToast('Network error during status update');
+    } finally {
+      setArchiveConfirmModalDoc(null);
     }
   };
 
@@ -874,7 +889,13 @@ function App() {
     const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           c.originalFilename.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesRisk = riskFilter === 'ALL' || riskLevel.toUpperCase() === riskFilter.toUpperCase();
-    return matchesSearch && matchesRisk;
+    const matchesStatus = statusTab === 'ACTIVE' 
+      ? c.approvalStatus !== 'ARCHIVED' 
+      : statusTab === 'ARCHIVED' 
+      ? c.approvalStatus === 'ARCHIVED' 
+      : true;
+
+    return matchesSearch && matchesRisk && matchesStatus;
   });
 
   const paginatedContracts = filteredContracts.slice(
@@ -1250,6 +1271,47 @@ function App() {
       />
       <div className="app-layout">
         {toast && <div className="toast-msg">{toast}</div>}
+
+      {/* Archive Confirmation Modal */}
+      {archiveConfirmModalDoc && (
+        <div className="modal-backdrop">
+          <div className="modal-content glass-card" style={{ maxWidth: '480px', width: '90%' }}>
+            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 15, marginBottom: 20 }}>
+              <h2 className="section-title" style={{ margin: 0 }}>📦 Archive Contract</h2>
+              <button 
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18 }}
+                onClick={() => setArchiveConfirmModalDoc(null)}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <p style={{ color: '#cbd5e1', fontSize: 14, lineHeight: 1.5, marginBottom: 15 }}>
+              Are you sure you want to archive <strong>"{archiveConfirmModalDoc.title}"</strong>?
+            </p>
+            
+            <p style={{ color: '#94a3b8', fontSize: 12, lineHeight: 1.5, marginBottom: 25, background: 'rgba(255,255,255,0.03)', padding: 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+              💡 <strong>Preservation Guaranteed:</strong> Archiving will move this contract to read-only status and hide it from your active list. All MongoDB audit logs, PostgreSQL vector search embeddings, and stored PDF files will remain intact.
+            </p>
+
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => setArchiveConfirmModalDoc(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn" 
+                style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#ffffff' }}
+                onClick={() => handleUpdateContractStatus('ARCHIVED', archiveConfirmModalDoc.id)}
+              >
+                Confirm Archive
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Share Modal */}
       {showShareModal && (
@@ -1666,6 +1728,31 @@ function App() {
               </div>
             ) : (
               <div className="glass-card">
+                {/* Status Filter Tab Bar */}
+                <div className="status-filter-tabs" style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '14px', flexWrap: 'wrap' }}>
+                  <button 
+                    className={`btn ${statusTab === 'ACTIVE' ? '' : 'btn-secondary'}`}
+                    style={{ padding: '8px 16px', fontSize: '13px', borderRadius: '8px', background: statusTab === 'ACTIVE' ? 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)' : 'rgba(255,255,255,0.04)', color: '#ffffff' }}
+                    onClick={() => { setStatusTab('ACTIVE'); setCurrentPage(1); }}
+                  >
+                    📁 Active Contracts ({contracts.filter(c => c.approvalStatus !== 'ARCHIVED').length})
+                  </button>
+                  <button 
+                    className={`btn ${statusTab === 'ARCHIVED' ? '' : 'btn-secondary'}`}
+                    style={{ padding: '8px 16px', fontSize: '13px', borderRadius: '8px', background: statusTab === 'ARCHIVED' ? 'linear-gradient(135deg, #64748B 0%, #475569 100%)' : 'rgba(255,255,255,0.04)', color: '#ffffff' }}
+                    onClick={() => { setStatusTab('ARCHIVED'); setCurrentPage(1); }}
+                  >
+                    📦 Archived Contracts ({contracts.filter(c => c.approvalStatus === 'ARCHIVED').length})
+                  </button>
+                  <button 
+                    className={`btn ${statusTab === 'ALL' ? '' : 'btn-secondary'}`}
+                    style={{ padding: '8px 16px', fontSize: '13px', borderRadius: '8px', background: statusTab === 'ALL' ? 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)' : 'rgba(255,255,255,0.04)', color: '#ffffff' }}
+                    onClick={() => { setStatusTab('ALL'); setCurrentPage(1); }}
+                  >
+                    📋 All Contracts ({contracts.length})
+                  </button>
+                </div>
+
                 {/* Search Bar & Labeled Controls */}
                 <div className="table-controls" style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: '20px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '220px', flexGrow: 1 }}>
@@ -1704,7 +1791,11 @@ function App() {
                   <div className="empty-state">
                     <span className="empty-state-icon">📂</span>
                     <h3 className="empty-state-title">No Contracts Found</h3>
-                    <p className="empty-state-description">No contracts match your search parameters or risk filters. Adjust your filters or upload a new contract.</p>
+                    <p className="empty-state-description">
+                      {statusTab === 'ARCHIVED' 
+                        ? 'No contracts are currently archived in this workspace.' 
+                        : 'No contracts match your search parameters or risk filters. Adjust your filters or upload a new contract.'}
+                    </p>
                   </div>
                 ) : (
                   <>
@@ -1718,7 +1809,7 @@ function App() {
                             <th style={{ verticalAlign: 'middle', padding: '12px 16px' }}>Expiration Date</th>
                             <th style={{ verticalAlign: 'middle', padding: '12px 16px' }}>Risk Assessment</th>
                             <th style={{ verticalAlign: 'middle', padding: '12px 16px' }}>Approval Status</th>
-                            <th style={{ verticalAlign: 'middle', padding: '12px 16px', minWidth: '190px' }}>Actions</th>
+                            <th style={{ verticalAlign: 'middle', padding: '12px 16px', minWidth: '220px' }}>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1828,6 +1919,23 @@ function App() {
                                     >
                                       Inspect
                                     </button>
+                                    {doc.approvalStatus === 'ARCHIVED' ? (
+                                      <button 
+                                        className="btn btn-secondary" 
+                                        style={{ padding: '6px 12px', fontSize: '11px', whiteSpace: 'nowrap', border: '1px solid rgba(16, 185, 129, 0.4)', color: '#34d399' }} 
+                                        onClick={() => handleUpdateContractStatus('ACTIVE', doc.id)}
+                                      >
+                                        Unarchive
+                                      </button>
+                                    ) : (
+                                      <button 
+                                        className="btn btn-secondary" 
+                                        style={{ padding: '6px 12px', fontSize: '11px', whiteSpace: 'nowrap', border: '1px solid rgba(245, 158, 11, 0.4)', color: '#fbbf24' }} 
+                                        onClick={() => setArchiveConfirmModalDoc(doc)}
+                                      >
+                                        Archive
+                                      </button>
+                                    )}
                                     <button 
                                       className="btn btn-danger" 
                                       style={{ padding: '6px 12px', fontSize: '11px', whiteSpace: 'nowrap' }} 
