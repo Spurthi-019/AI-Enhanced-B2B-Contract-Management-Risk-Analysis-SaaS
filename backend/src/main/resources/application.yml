@@ -4,24 +4,21 @@ spring:
   application:
     name: backend
   datasource:
-    url: jdbc:postgresql://localhost:5432/contractiq
-    username: postgres
-    password: Spurthi@123
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/contractiq}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:Spurthi@123}
     driver-class-name: org.postgresql.Driver
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
+    show-sql: false
   data:
     mongodb:
-      uri: mongodb://localhost:27017/contractiq
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://localhost:27017/contractiq}
   ai:
     ollama:
-      base-url: http://localhost:11434
+      base-url: ${SPRING_AI_OLLAMA_BASE_URL:http://localhost:11434}
       mock: false
       chat:
         options:
@@ -37,8 +34,8 @@ spring:
         distance-type: COSINE_DISTANCE
         dimensions: 768
   mail:
-    host: localhost
-    port: 1025
+    host: ${SPRING_MAIL_HOST:localhost}
+    port: ${SPRING_MAIL_PORT:1025}
     properties:
       mail:
         smtp:
@@ -47,14 +44,14 @@ spring:
             enable: false
 
 server:
-  port: 8081
+  port: ${PORT:8081}
 
 security:
   jwt:
-    secret: your_secure_base64_jwt_signing_key_here_must_be_at_least_256_bits
+    secret: ${JWT_SECRET:your_secure_base64_jwt_signing_key_here_must_be_at_least_256_bits}
     expiration-ms: 604800000
 
 logging:
   level:
-    org.springframework.security: DEBUG
-    com.contractiq: DEBUG
+    org.springframework.security: INFO
+    com.contractiq: INFO

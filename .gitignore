@@ -3,6 +3,10 @@ target/
 *.class
 *.jar
 !.mvn/wrapper/maven-wrapper.jar
+application-dev.yml
+application-local.yml
+application-*.yml
+application-*.properties
 
 # --- Node / React (Vite) ---
 node_modules/
@@ -13,6 +17,9 @@ dist/
 .env
 .env.local
 .env.*.local
+*.key
+*.pem
+*.secret
 
 # --- IDE / editor ---
 .vscode/
