@@ -1,112 +1,211 @@
-# ContractIQ
+# ContractIQ 📜🤖
+### AI-Enhanced B2B Contract Management & Risk Analysis SaaS
 
-**AI-Powered Multi-Tenant SaaS Platform for Contract Negotiation**
+> **Enterprise-grade B2B Contract Lifecycle & Risk Analysis SaaS powered by local RAG, automated risk scoring, and secure vendor collaboration.**
 
-ContractIQ helps legal, procurement, and vendor-management teams negotiate contracts faster and more safely by combining AI-assisted contract analysis with a structured internal/external collaboration workflow. Each customer organization (tenant) operates in a fully isolated workspace — their contracts, comments, and negotiation strategy are never visible to any other tenant.
-
-> **Status:** Pre-development. This document defines product scope only. No implementation has begun.
-
----
-
-## 1. Problem Statement
-
-Contract negotiation today is slow and risky because:
-- Legal teams manually re-read long contracts to spot risky clauses.
-- Internal strategy discussions ("what are we willing to concede?") happen in email/Slack, disconnected from the contract itself, and often accidentally get forwarded to the vendor.
-- There's no single source of truth for contract version history and negotiation state.
-
-ContractIQ solves this with AI-assisted clause analysis plus a workflow that structurally separates **internal-only** discussion from **vendor-facing** discussion, so confidential strategy can never leak into a vendor-visible comment by accident.
+![Java 17](https://img.shields.io/badge/Java-17-007396?style=for-the-badge&logo=java&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)
+![Spring AI](https://img.shields.io/badge/Spring_AI-1.0-6DB33F?style=for-the-badge&logo=spring&logoColor=white)
+![React.js](https://img.shields.io/badge/React-18.x-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.x-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16_with_pgvector-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-7.0-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
+![Ollama](https://img.shields.io/badge/Ollama-Local_RAG-000000?style=for-the-badge&logo=ollama&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
 ---
 
-## 2. User Roles (Personas)
+## 📌 High-Level Executive Overview
 
-Defining roles now avoids painful rework later — every requirement below should be checked against "which role can do this?"
+**ContractIQ** is a production-ready, full-stack B2B SaaS platform designed to automate contract risk evaluation, accelerate vendor negotiations, and maintain immutable audit records. By pairing **Spring Boot 3.x** and **React 18** with a **local RAG AI pipeline (Ollama + pgvector)**, ContractIQ enables corporate legal and procurement teams to analyze multi-page legal PDFs in seconds — with **zero external AI API costs** and **100% data privacy**.
 
-| Role | Description |
-|---|---|
-| **Tenant Admin** | Manages users, billing, tenant settings for their organization. |
-| **Internal Legal/Negotiator** | Uploads contracts, runs AI analysis, writes internal and vendor-facing comments, sends contracts out for negotiation. |
-| **Internal Viewer** | Read-only access to contracts and internal comments (e.g., a stakeholder who needs visibility but doesn't negotiate). |
-| **Vendor/External Counterparty** | The other party in the negotiation. Has a restricted, invite-only view: sees only the contract and comments explicitly marked vendor-facing. Never sees internal discussion, AI risk scores, or other tenants' data. |
-| **Platform Super Admin** (you, the operator) | Anthropic-style internal role for platform operations — tenant provisioning, support, monitoring. Not a customer-facing role. |
-
-**Open question to resolve before backend design:** Is a "Vendor" its own tenant with a restricted relationship to the negotiating tenant, or a special non-tenant guest-access role scoped to one contract? *(Flagging this now — it materially changes your data model and is worth a dedicated design session before coding.)*
+### Core Architecture Highlights
+* **Zero Third-Party AI Lock-In**: Powered by locally hosted LLMs (`llama3`) via Ollama and `pgvector` hybrid similarity search.
+* **Dual-Database Storage Model**: Structured relational data & tenant configuration stored in **PostgreSQL**, while unstructured document metadata, version histories, and immutable activity feeds live in **MongoDB**.
+* **Zero-Trust Multi-Tenancy**: Workspace-isolated JWT context scoping across all REST APIs, vector queries, and document repositories.
+* **External Negotiation Gateway**: Unauthenticated, cryptographically signed **Magic Portal Links** allowing external vendors to review version counter-offers, submit public replies, and upload revised PDF copies safely.
 
 ---
 
-## 3. Functional Requirements
+## 🛠️ Core Technology Stack
 
-### 3.1 Core AI Features
-- **FR-1: AI Contract Ingestion** — Users can upload a contract (PDF/DOCX) and the system extracts and stores its text and structure.
-- **FR-2: Clause Extraction** — AI identifies and labels standard clause types (e.g., Indemnification, Limitation of Liability, Termination, Governing Law, Auto-Renewal).
-- **FR-3: Risk Scoring** — AI flags clauses as Low/Medium/High risk relative to configurable playbook rules, with a plain-language explanation of *why*.
-- **FR-4: Redline Suggestions** — AI proposes alternative clause language aligned to the tenant's negotiation playbook/preferred terms.
-- **FR-5: AI Negotiation Chat** — Users can ask natural-language questions about a specific contract ("What's our exposure under clause 8.2?") and get answers grounded only in that contract's text.
-- **FR-6: Contract Summary Generation** — AI produces an executive summary of a contract's key terms and risk areas.
-
-### 3.2 Internal / Vendor Comment Workflow
-- **FR-7: Dual-Channel Commenting** — Every clause supports two independent comment threads: **Internal** (never leaves the tenant) and **Vendor-Facing** (visible to the invited counterparty).
-- **FR-8: Visual Distinction** — The UI must make it visually unmistakable which channel a comment is in before a user posts (preventing accidental strategy leaks — this directly serves the data-isolation principle discussed above, just at the comment level instead of the tenant level).
-- **FR-9: Promote Comment** — An internal user can explicitly "promote" an internal comment to vendor-facing (an intentional, auditable action — never automatic).
-- **FR-10: Comment Audit Trail** — Every comment, edit, and promotion is timestamped and attributed to a user, permanently.
-- **FR-11: Vendor Restricted View** — Vendor users see only: the current contract version, vendor-facing comments, and their own submitted redlines. They never see AI risk scores, internal comments, or playbook data.
-
-### 3.3 Contract Lifecycle
-- **FR-12: Version History** — Every edit/redline creates a new tracked version; users can diff any two versions.
-- **FR-13: Status Workflow** — Contracts move through defined states (e.g., Draft → Internal Review → Sent to Vendor → In Negotiation → Signed → Archived).
-- **FR-14: Notifications** — Users are notified when a vendor responds, a comment is promoted, or a contract status changes.
+| Layer | Technologies & Tools | Key Role & Application |
+|---|---|---|
+| **Backend Framework** | Java 17, Spring Boot 3.x, Spring Data JPA, Spring Security | Enterprise REST API, JWT auth, tenant context ThreadLocals, security rules |
+| **AI & Vector Engine** | Spring AI, Ollama (`llama3`), `pgvector` | Local RAG context retrieval, legal clause vectorization, plain-English Q&A |
+| **Frontend UI** | React 18, TypeScript, Tailwind CSS, Lucide Icons | Responsive Glassmorphism interface, interactive PDF viewer, AI Chat studio |
+| **Relational Database** | PostgreSQL 16 (`pgvector` extension) | Vector embeddings, relational tenant mappings, and structured indexes |
+| **Document Database** | MongoDB 7.0 | Contract versions, audit trails, and internal vs. public collaboration notes |
+| **Email & Testing** | MailDev (Local SMTP Container) | Automated email notification pipeline for uploads, comments, and counter-offers |
+| **DevOps & Tooling** | Docker, Docker Compose, Maven | Containerized database stack, reproducible builds, and seamless orchestration |
 
 ---
 
-## 4. Non-Functional Requirements
+## 🚀 Key System Features
 
-### 4.1 Multi-Tenancy
-- **NFR-1: Tenant Data Isolation** — No user, query, or AI prompt may ever access another tenant's data, under any circumstance, including bugs, admin tooling, and AI context windows. *(This is the single most important requirement in this document — see Part 1 discussion on why.)*
-- **NFR-2: Tenant Identification Strategy** — [Decision pending] Choose one of: separate schema per tenant, or shared schema with enforced `tenant_id` + PostgreSQL Row-Level Security. Decision must be documented with rationale before database design begins.
-- **NFR-3: AI Context Isolation** — When calling the AI model (Spring AI), the prompt/context sent must be scoped to a single tenant's data only — never batch multiple tenants' contracts into one AI call.
-- **NFR-4: Tenant Onboarding/Offboarding** — New tenants can be provisioned without code changes; a tenant's data can be fully exported and deleted on request (supports compliance/right-to-erasure).
+### 1. 🤖 Automated Risk Scoring Engine
+* Ingests contract PDF uploads via `PdfParsingService` and extracts raw textual blocks.
+* Analyzes compliance against standard legal playbooks (GDPR data privacy, liability limits, indemnification boundaries, governing law).
+* Color-codes overall risk indexes (**HIGH / MEDIUM / LOW**) and displays an interactive gauge alongside clause-by-clause mitigation suggestions.
 
-### 4.2 Security
-- **NFR-5: Authentication** — Secure login (password + MFA at minimum) for internal users; separate, more restricted auth flow for vendor guest access (e.g., invite-link + email verification, scoped to one contract).
-- **NFR-6: Authorization (RBAC)** — Every API endpoint enforces role-based access control matching Section 2's role table — checked server-side, never trusted from the client.
-- **NFR-7: Encryption** — Data encrypted in transit (TLS) and at rest (database-level encryption).
-- **NFR-8: Audit Logging** — Security-relevant events (login, role change, comment promotion, contract export) are logged immutably.
-- **NFR-9: Least Privilege** — Platform Super Admin access to tenant contract content is logged and restricted to support-ticket-justified access, not standing access.
+### 2. 💬 Local RAG AI Chat (Review Studio)
+* Interactive, context-grounded AI assistant embedded directly inside the contract Review Studio.
+* Performs similarity searches across PostgreSQL `pgvector` embeddings to pull top matching contract chunks.
+* Strictly enforces plain-English, non-markdown single-paragraph responses per enterprise formatting standards (`RAG_SYSTEM_PROMPT`).
 
-### 4.3 Scalability & Performance
-- **NFR-10: Horizontal Scalability** — Application tier must scale out statelessly (multiple Spring Boot instances behind a load balancer).
-- **NFR-11: Async AI Processing** — Long-running AI operations (full contract analysis) run asynchronously with status polling/webhooks, not as blocking HTTP requests.
-- **NFR-12: Response Time Targets** — [Placeholder — define with real numbers once you have usage estimates, e.g., "AI chat response starts streaming within 2s."]
-- **NFR-13: Multi-Tenant Fair Usage** — One tenant's heavy AI usage must not degrade performance for other tenants (rate limiting / quota per tenant).
+### 3. 🔐 Multi-Tenant Vendor Negotiation (Magic Links)
+* Generates time-bounded, cryptographically signed vendor collaboration URLs.
+* Enables external vendor contacts to review contract versions, post public notes, and upload counter-offer PDFs **without creating user account credentials**.
+* Automatically creates next-generation version iterations (`v2`, `v3`) upon vendor counter-offer uploads.
 
-### 4.4 Reliability & Compliance
-- **NFR-14: Availability Target** — [Placeholder — e.g., 99.9% uptime, once you have an SLA in mind.]
-- **NFR-15: Backup & Recovery** — Automated, tested backups with a defined Recovery Point Objective (RPO) and Recovery Time Objective (RTO).
-- **NFR-16: Compliance Readiness** — Design with SOC 2 and GDPR principles in mind from day one (audit trails, data isolation, right to erasure) even if formal certification is a later milestone.
+### 4. 🔒 Internal vs. Public Privacy & Audit Trail
+* Implements dual-channel collaboration notes: **Internal Strategy** (visible only to workspace employees) vs. **Vendor Facing** (shared with external counterparties).
+* Immutably logs every upload, status change, comment posting, and magic link generation in MongoDB audit collections.
 
----
+### 5. 📧 Automated Notification Pipeline
+* Integrates Spring Boot Mail sender with a local **MailDev** SMTP container (`http://localhost:1080`).
+* Triggers HTML email notifications for contract uploads, vendor counter-offers, team invitations, and status changes.
 
-## 5. Out of Scope (v1)
-
-Explicitly *not* building in the first version — revisit later:
-- E-signature integration (assume signing happens outside ContractIQ for now)
-- Billing/payments system
-- Mobile native apps (web-responsive only)
-- Multi-language contract support (English only for v1)
+### 6. 📦 Archival & Compliance Workflow
+* Manages contract lifecycle transitions: `DRAFT` ➔ `UNDER_REVIEW` ➔ `APPROVED` ➔ `ACTIVE` ➔ `ARCHIVED`.
+* **Read-Only Mode**: When archived, contract comment submission and vendor magic link generation are locked, while PDF previews, AI risk scores, and AI Chat remain active.
+* Preserves all MongoDB audit histories, PostgreSQL vector search embeddings, and stored PDF files permanently.
 
 ---
 
-## 6. Open Decisions (must resolve before backend design)
+## 📐 System Architecture Diagram
 
-1. Vendor access model: separate tenant vs. scoped guest role (see Section 2).
-2. Tenant isolation strategy: shared-schema-with-RLS vs. schema-per-tenant (see NFR-2).
-3. AI model context boundaries: how much of a contract's history is sent per AI call, and how is that scoped and logged.
+```mermaid
+graph TD
+    subgraph Client Layer ["Client & User Layer"]
+        UserBrowser["React 18 SPA (Port 5173)\nTailwind CSS + Glassmorphism UI"]
+        VendorPortal["External Vendor Portal\nMagic Link Access"]
+    end
+
+    subgraph Application Tier ["Spring Boot 3.x Backend (Port 8081)"]
+        Security["JwtAuthenticationFilter & TenantContext"]
+        ContractCtrl["Contract & Vendor Controllers"]
+        RAGService["ContractAiService (RAG Engine)"]
+        AnalysisService["ContractAnalysisService"]
+        MailService["EmailNotificationService"]
+    end
+
+    subgraph Data & AI Infrastructure ["Data & AI Infrastructure Layer"]
+        PG["PostgreSQL 16 + pgvector\n(Vector Embeddings & Relational Data)"]
+        Mongo["MongoDB 7.0\n(Contracts, Version History & Audit Logs)"]
+        Ollama["Ollama Local LLM Node (Port 11434)\n(Llama 3 / Nomic-Embed)"]
+        MailDev["MailDev Container (Port 1080/1025)\n(Local SMTP Server)"]
+    end
+
+    UserBrowser -->|HTTPS / REST API| Security
+    VendorPortal -->|Magic Link Token| Security
+    Security --> ContractCtrl
+    ContractCtrl --> AnalysisService
+    ContractCtrl --> RAGService
+    RAGService -->|Similarity Search| PG
+    RAGService -->|Inference Call| Ollama
+    AnalysisService -->|Document Metadata| Mongo
+    ContractCtrl --> MailService
+    MailService -->|SMTP| MailDev
+```
 
 ---
 
-## 7. Tech Stack (confirmed)
-- **Backend:** Spring Boot
-- **Frontend:** React
-- **Database:** PostgreSQL
-- **AI Integration:** Spring AI
+## 💻 Local Setup & Installation Guide
+
+### 1. Prerequisites
+Ensure you have the following installed on your developer machine:
+* **Java Development Kit (JDK 17+)**
+* **Node.js (v18+) & npm**
+* **Docker & Docker Desktop**
+* **Ollama** (optional for local LLM inference; fallback semantic engine active by default)
+
+---
+
+### 2. Step-by-Step Terminal Commands
+
+#### Step A: Clone Repository & Start Infrastructure Services
+```bash
+# Clone the repository
+git clone https://github.com/Spurthi-019/AI-Enhanced-B2B-Contract-Management-Risk-Analysis-SaaS.git
+cd AI-Enhanced-B2B-Contract-Management-Risk-Analysis-SaaS
+
+# Start PostgreSQL (pgvector), MongoDB, and MailDev containers
+docker-compose up -d
+```
+
+#### Step B: Launch Local Ollama Model (Optional for local LLMs)
+```bash
+# Serve Ollama and pull llama3 model
+ollama serve
+ollama pull llama3
+```
+
+#### Step C: Build & Start Spring Boot Backend
+```bash
+cd backend
+
+# Compile and start backend server (runs on http://localhost:8081)
+.\mvnw.cmd spring-boot:run
+```
+
+#### Step D: Install & Start React Frontend
+```bash
+cd ../frontend
+
+# Install dependencies and start Vite dev server (runs on http://localhost:5173)
+npm install
+npm run dev
+```
+
+---
+
+## 🔑 Environment Variables Reference
+
+| Variable Name | Default Value | Purpose / Description |
+|---|---|---|
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/contractiq` | Relational & vector database connection string |
+| `SPRING_DATASOURCE_USERNAME` | `postgres` | PostgreSQL superuser username |
+| `SPRING_DATASOURCE_PASSWORD` | `postgres` | PostgreSQL database password |
+| `SPRING_DATA_MONGODB_URI` | `mongodb://localhost:27017/contractiq` | MongoDB document store URI |
+| `SPRING_AI_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama local API base endpoint |
+| `SPRING_AI_OLLAMA_CHAT_MODEL` | `llama3` | Default local LLM model name |
+| `SPRING_MAIL_HOST` | `localhost` | MailDev SMTP server hostname |
+| `SPRING_MAIL_PORT` | `1025` | MailDev SMTP server port |
+| `JWT_SECRET` | `your_secure_base64_jwt_signing_key_here_must_be_at_least_256_bits` | HMAC-SHA256 JWT signing secret key |
+
+---
+
+## 📑 Key REST API Endpoints
+
+| Method | Endpoint Path | Description | Access Level |
+|---|---|---|---|
+| `POST` | `/api/v1/auth/login` | Authenticate user & issue JWT bearer token | Public |
+| `GET` | `/api/v1/contracts` | Fetch tenant contracts (filters archived by default) | Authenticated |
+| `POST` | `/api/v1/contracts/upload` | Upload PDF agreement & trigger vector indexing | Authenticated |
+| `GET` | `/api/v1/contracts/{id}/download` | Stream PDF file preview for embedded viewer | Authenticated |
+| `POST` | `/api/v1/contracts/{id}/analyze` | Trigger automated RAG risk evaluation | Authenticated |
+| `PATCH/PUT` | `/api/v1/contracts/{id}/status` | Update contract lifecycle status (`ARCHIVED`, `APPROVED`, etc.) | Authenticated |
+| `POST` | `/api/ai/chat` | Ask grounded natural-language questions (RAG AI Chat) | Authenticated |
+| `POST` | `/api/v1/vendor/portal/magic-link` | Generate secure external vendor collaboration link | Authenticated |
+| `GET` | `/api/v1/vendor/portal/access` | Validate vendor magic link token & fetch contract view | Vendor Public |
+| `POST` | `/api/v1/vendor/portal/upload` | Vendor counter-offer PDF upload (creates new version) | Vendor Public |
+
+---
+
+## 🌟 Resume & Recruiter Technical Highlights
+
+> **Technical Highlights for Engineering Managers & Technical Recruiters:**
+
+1. **Zero Third-Party AI API Overhead**: Engineered an enterprise RAG pipeline using local **Ollama (`llama3`)** and **PostgreSQL `pgvector`**, keeping confidential legal contracts 100% on-premise while eliminating cloud API consumption costs.
+2. **Dual-Database Architectural Design**: Combined **PostgreSQL** for relational schema consistency & vector embeddings with **MongoDB** for high-throughput, unstructured audit logs and multi-version document histories.
+3. **Stateless Multi-Tenancy & Zero-Trust Security**: Designed ThreadLocal-based `TenantContext` propagation in Spring Security filters, ensuring zero cross-tenant data leakage across REST queries, vector searches, and file storage.
+4. **Token-Gated Vendor Gateway**: Built an unauthenticated external negotiation workflow using cryptographically signed JWT tokens, allowing counterparty collaboration without bloating workspace user seats.
+
+---
+
+## 📜 License & Author
+
+* **Author**: Spurthi ([@Spurthi-019](https://github.com/Spurthi-019))
+* **Repository**: [AI-Enhanced-B2B-Contract-Management-Risk-Analysis-SaaS](https://github.com/Spurthi-019/AI-Enhanced-B2B-Contract-Management-Risk-Analysis-SaaS)
+* **License**: MIT License
